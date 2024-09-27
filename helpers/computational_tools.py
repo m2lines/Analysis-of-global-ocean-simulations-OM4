@@ -10,25 +10,27 @@ import xgcm
 
 def x_coord(array):
     '''
-    Returns horizontal coordinate, 'xq' or 'xh'
+    Returns horizontal coordinate, 'xq', 'xh' or 'lon'
     as xarray
     '''
-    try:
-        coord = array.xq
-    except:
-        coord = array.xh
-    return coord
+    for name in ['xh', 'xq', 'lon']:
+        if name in array.dims:
+            return array[name]
 
 def y_coord(array):
     '''
     Returns horizontal coordinate, 'yq' or 'yh'
     as xarray
     '''
-    try:
-        coord = array.yq
-    except:
-        coord = array.yh
-    return coord
+    for name in ['yh', 'yq', 'lon']:
+        if name in array.dims:
+            return array[name]
+
+def sort_longitude(x):
+    lon = x_coord(x)
+    x[lon.name] = np.where(lon>0, lon, 360+lon)
+    x = x.sortby(lon.name)
+    return x
 
 def rename_coordinates(xr_dataset):
     '''
@@ -60,7 +62,7 @@ def select_LatLon(array, Lat=(35,45), Lon=(5,15)):
     return array.sel({x.name: slice(Lon[0],Lon[1]), 
                       y.name: slice(Lat[0],Lat[1])})
 
-def remesh(input, target, fillna=True):
+def remesh(input, target, fillna=False):
     '''
     Input and target should be xarrays of any type (u-array, v-array, q-array, h-array).
     Datasets are prohibited.

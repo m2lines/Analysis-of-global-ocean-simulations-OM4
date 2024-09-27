@@ -77,8 +77,9 @@ class Experiment:
 
         return result
 
-    def set_averaging_time(self):
-        self.Averaging_time = slice(None,None)
+    @property
+    def Averaging_time(self):
+        return slice('1979','1981')
 
     @classmethod
     def get_list_of_main_properties(cls):
@@ -99,27 +100,27 @@ class Experiment:
 
     @cached_property
     def param(self):
-        result = xr.open_dataset(os.path.join(self.folder, 'ocean_geometry.nc')).rename(
+        result = sort_longitude(xr.open_dataset(os.path.join(self.folder, 'ocean_geometry.nc')).rename(
                 {'latq': 'yq', 'lonq': 'xq', 'lath': 'yh', 'lonh': 'xh'} # change coordinates notation as in other files
-            )
-        return rename_coordinates(result)
+            ))
+        rename_coordinates(result)
         return result
 
     @cached_property
     def ocean_daily(self):
-        result = xr.open_mfdataset(os.path.join(self.folder, '*ocean_daily*.nc'), parallel=True)
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_daily*.nc'), parallel=True))
         rename_coordinates(result)
         return result
     
     @cached_property
     def ocean_month(self):
-        result = xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_0*.nc'), parallel=True)
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_0*.nc'), parallel=True))
         rename_coordinates(result)
         return result
     
     @cached_property
     def ocean_month_z(self):
-        result = xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True)
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True))
         rename_coordinates(result)
         return result
 
@@ -143,6 +144,20 @@ class Experiment:
     ########################  Statistical tools  #########################
 
     #-------------------  Mean flow and variability  --------------------#
+    # @netcdf_property
+    # def ssh_mean(self):
+    #     return self.ssf.sel(Time=self.Averaging_time).mean(dim='Time')
+
+    @cached_property
+    def woa_temp(self):
+        return sort_longitude(xr.open_dataset('/vast/pp2681/WOA/woa_1981_2010.nc', decode_times=False).isel(time=0).rename({'lat':'yh', 'lon': 'xh'})).t_an.chunk({})
+    
+    @cached_property
+    def woa_nan(self):
+        return np.isnan(self.woa_temp)
+
     @netcdf_property
-    def ssh_mean(self):
-        return self.ssf.sel(Time=self.Averaging_time).mean(dim='Time')
+    def SST(self):
+        out = self.ocean_month_z.thetao.isel(z_l=0).sel(time=self.Averaging_time).mean('time')
+        out = remesh(out, self.woa_temp)
+        return xr.where(self.woa_nan.isel(depth=0), np.nan, out)
