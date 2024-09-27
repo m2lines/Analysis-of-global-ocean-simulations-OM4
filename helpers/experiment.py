@@ -150,20 +150,17 @@ class Experiment:
 
     @cached_property
     def woa_temp(self):
-        return sort_longitude(xr.open_dataset('/vast/pp2681/WOA/woa_1981_2010.nc', decode_times=False).isel(time=0).rename({'lat':'yh', 'lon': 'xh'})).t_an.chunk({})
-    
-    @cached_property
-    def woa_interp(self):
-        return self.woa_temp.interp(depth=self.ocean_month_z.zl)
-
-    @netcdf_property
-    def SST(self):
-        out = self.ocean_month_z.thetao.isel(zl=0).sel(time=self.Averaging_time).mean('time')
-        out = remesh(out, self.woa_temp)
-        return xr.where(np.isnan(self.woa_temp).isel(depth=0), np.nan, out)
+        '''
+        WOA temperature data on its native horizontal 1x1 grid
+        and vertical grid of MOM6 output
+        '''
+        woa = sort_longitude(xr.open_dataset('/vast/pp2681/WOA/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'})).t_an.chunk({})
+        woa_interp = woa.interp(depth=self.ocean_month_z.zl)
+        woa_interp[{'zl':0}] = woa[{'depth':0}]
+        return woa_interp.squeeze().drop_vars(['time', 'depth'])
     
     @netcdf_property
     def thetao(self):
         out = self.ocean_month_z.thetao.sel(time=self.Averaging_time).mean('time')
-        out = remesh(out, self.woa_interp)
-        return xr.where(np.isnan(self.woa_interp), np.nan, out)
+        out = remesh(out, self.woa_temp)
+        return xr.where(np.isnan(self.woa_temp), np.nan, out)
