@@ -120,7 +120,7 @@ class Experiment:
     
     @cached_property
     def ocean_month_z(self):
-        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True))
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True)).rename({'z_l': 'zl'})
         rename_coordinates(result)
         return result
 
@@ -153,11 +153,17 @@ class Experiment:
         return sort_longitude(xr.open_dataset('/vast/pp2681/WOA/woa_1981_2010.nc', decode_times=False).isel(time=0).rename({'lat':'yh', 'lon': 'xh'})).t_an.chunk({})
     
     @cached_property
-    def woa_nan(self):
-        return np.isnan(self.woa_temp)
+    def woa_interp(self):
+        return self.woa_temp.interp(depth=self.ocean_month_z.zl)
 
     @netcdf_property
     def SST(self):
-        out = self.ocean_month_z.thetao.isel(z_l=0).sel(time=self.Averaging_time).mean('time')
+        out = self.ocean_month_z.thetao.isel(zl=0).sel(time=self.Averaging_time).mean('time')
         out = remesh(out, self.woa_temp)
-        return xr.where(self.woa_nan.isel(depth=0), np.nan, out)
+        return xr.where(np.isnan(self.woa_temp).isel(depth=0), np.nan, out)
+    
+    @netcdf_property
+    def thetao(self):
+        out = self.ocean_month_z.thetao.sel(time=self.Averaging_time).mean('time')
+        out = remesh(out, self.woa_interp)
+        return xr.where(np.isnan(self.woa_interp), np.nan, out)

@@ -57,10 +57,7 @@ class netcdf_property:
             pass
 
         #print(f'Calculating value of {funcname}')
-        try:
-            value = self.function(instance).chunk({'Time':1,'zl':1})
-        except:
-            value = self.function(instance) # for very small objects
+        value = self.function(instance).compute()
         
         # Save value only if it is not trivial
         if free_of_NaNs_and_zeros(value):
@@ -92,7 +89,7 @@ def free_of_NaNs_and_zeros(value):
         else:
             False
     else:
-        if value.notnull().sum() > value.size/2: # 50% of values are not nan
+        if value.notnull().sum() > value.size*0.05: # 5% of values are not nan
             return True
         else:
             False

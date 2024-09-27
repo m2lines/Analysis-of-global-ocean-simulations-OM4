@@ -86,11 +86,11 @@ def remesh(input, target, fillna=False):
     y_target = y_coord(target)
 
     # ratio of mesh steps
-    ratiox = np.diff(x_target)[0] / np.diff(x_input)[0]
-    ratiox = math.ceil(ratiox)
+    ratiox = np.diff(x_target).max() / np.diff(x_input).max()
+    ratiox = round(ratiox)
 
-    ratioy = np.diff(y_target)[0] / np.diff(y_input)[0]
-    ratioy = math.ceil(ratioy)
+    ratioy = np.diff(y_target).max() / np.diff(y_input).max()
+    ratioy = round(ratioy)
     
     # B.C.
     if fillna:

@@ -7,6 +7,7 @@ import cmocean
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
+import dask
 
 class CollectionOfExperiments:
     '''
@@ -67,6 +68,7 @@ class CollectionOfExperiments:
         additional_subfolder - if results are stored not in common_folder+exps[i],
         but in an additional subfolder 
         '''
+        dask.config.set(**{'array.slicing.split_large_chunks': True})
         folders = []
         for root, dirs, files in os.walk(common_folder):
             if os.path.isfile(os.path.join(root, additional_subfolder, 'ocean.stats.nc')):
