@@ -62,6 +62,36 @@ def select_LatLon(array, Lat=(35,45), Lon=(5,15)):
     return array.sel({x.name: slice(Lon[0],Lon[1]), 
                       y.name: slice(Lat[0],Lat[1])})
 
+def select_NA(array):
+    return select_LatLon(array, Lat=(20, 60), Lon=(260,330))
+
+def select_Pacific(array):
+    return select_LatLon(array, Lat=(10, 65), Lon=(-250+360,-130+360))
+
+def select_Cem(array):
+    return select_LatLon(array, Lat=(-10,15), Lon=(-260+360,-230+360))
+
+def select_globe(array):
+    return select_LatLon(array, Lat=(None,None), Lon=(None,None))
+
+def select_Equator(array):
+    return select_LatLon(array, Lat=(-20,20), Lon=(0,360))
+
+def select_Gulf_Juricke(array):
+    return select_LatLon(array, Lat=(30, 60), Lon=(-80+360,-20+360))
+
+def select_Kuroshio_Juricke(array):
+    return select_LatLon(array, Lat=(20, 50), Lon=(120,180))
+
+def select_SO_Juricke(array):
+    return select_LatLon(array, Lat=(-70,-30), Lon=(0,360))
+
+def select_Aghulas_Juricke(array):
+    return select_LatLon(array, Lat=(-60,-30), Lon=(0,60))
+
+def select_Malvinas_Juricke(array):
+    return select_LatLon(array, Lat=(-60,-30), Lon=(300,360))
+
 def remesh(input, target, fillna=False):
     '''
     Input and target should be xarrays of any type (u-array, v-array, q-array, h-array).

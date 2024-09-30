@@ -1,13 +1,29 @@
 import xarray as xr
 import os
 from helpers.experiment import Experiment
-from helpers.computational_tools import remesh, Lk_error
+from helpers.computational_tools import *
 from helpers.plot_helpers import *
 import cmocean
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 import dask
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import warnings
+
+def init_subplots(exps, labels, ncols=3):
+    if labels is None:
+            labels=exps
+    nfig = len(exps)
+    ncol = min(ncols,nfig)
+    nrows = nfig / ncols
+    if nrows > 1:
+        nrows = int(np.ceil(nrows))
+    else:
+        nrows = 1
+    
+    return labels, nrows, ncol
 
 class CollectionOfExperiments:
     '''
@@ -69,6 +85,7 @@ class CollectionOfExperiments:
         but in an additional subfolder 
         '''
         dask.config.set(**{'array.slicing.split_large_chunks': True})
+        warnings.filterwarnings("ignore")
         folders = []
         for root, dirs, files in os.walk(common_folder):
             if os.path.isfile(os.path.join(root, additional_subfolder, 'ocean.stats.nc')):
@@ -123,3 +140,24 @@ class CollectionOfExperiments:
             plt.ylabel('Available potential energy, Joules')
         plt.tight_layout()
         plt.legend(bbox_to_anchor=(1.5,1))
+
+    def plot_temp(self, exps, labels=None, zl=0, select=select_globe):
+        default_rcParams({'font.size': 10})
+        labels, nrows, ncol = init_subplots(exps, labels, ncols=2)
+        
+        fig = plt.figure(figsize=(4*ncol, 2*nrows), layout='constrained', dpi=200)
+        cmap = cmocean.cm.balance
+        cmap.set_bad('gray', alpha=1)
+
+        for ifig, exp in enumerate(exps):
+            ax = fig.add_subplot(nrows,ncol,ifig+1,projection=ccrs.Robinson(central_longitude=-180))
+            gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='--')
+            #ax.coastlines()
+            gl.top_labels = False
+            gl.top_labels = False  
+            data = select(self[exp].thetao).isel(zl=zl)
+            im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=0, vmax=30)
+            ax.set_global()
+            ax.set_title(labels[ifig])
+
+        plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')

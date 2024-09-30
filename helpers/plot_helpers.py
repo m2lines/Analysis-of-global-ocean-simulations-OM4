@@ -81,7 +81,7 @@ def default_rcParams(kw={}):
         #'font.family': 'DejaVuSans_Condensed',
         'mathtext.fontset': 'cm',
 
-        'figure.figsize': (4, 4),
+        'figure.figsize': (6, 6),
 
         'figure.subplot.wspace': 0.3,
         
