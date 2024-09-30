@@ -103,6 +103,19 @@ def select_Aghulas(array):
 def select_Malvinas(array):
     return select_LatLon(array, Lat=(-60,-30), Lon=(-60,0))
 
+# Sections
+def select_Drake(array):
+    return select_LatLon(array, Lat=(-70,-55), Lon=(-70,-69)).squeeze()
+
+def select_Atlantic_transect(array):
+    return select_LatLon(array, Lat=(-80,90), Lon=(-30,-29)).squeeze()
+
+def select_Pacific_transect(array):
+    return select_LatLon(array, Lat=(-80,90), Lon=(-130,-129)).squeeze()
+
+def select_Indian_transect(array):
+    return select_LatLon(array, Lat=(-80,30), Lon=(80,81)).squeeze()
+
 def remesh(input, target, fillna=False):
     '''
     Input and target should be xarrays of any type (u-array, v-array, q-array, h-array).

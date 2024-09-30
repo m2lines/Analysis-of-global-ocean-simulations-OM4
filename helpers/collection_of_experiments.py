@@ -197,3 +197,53 @@ class CollectionOfExperiments:
             ax.set_title(label)
 
         plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')
+
+    def plot_temp_section(self, exps, labels=None, select=select_Drake, plot_type = 'default'):
+        default_rcParams({'font.size': 10})
+        labels, nrows, ncol = init_subplots(exps, labels, ncols=2)
+        
+        fig = plt.figure(figsize=(4*ncol, 3*nrows), layout='constrained', dpi=200)
+        cmap_bias = cmocean.cm.balance
+        cmap_bias.set_bad('gray', alpha=1)
+
+        cmap_temp = cmocean.cm.thermal
+        cmap_temp.set_bad('gray', alpha=1)
+        
+        for ifig, exp in enumerate(exps):
+            ax = fig.add_subplot(nrows,ncol,ifig+1)
+            
+            label = labels[ifig]
+            if plot_type == 'default':
+                data = select(self[exp].thetao)
+                vmin = 0; vmax=30
+                cmap = cmap_temp
+            elif plot_type == 'bias':
+                data = select(self[exp].thetao - self[exp].woa_temp)
+                rmse = float(np.sqrt(np.nanmean(data**2)))
+                label = label + '\n RMSE=%.2f' % rmse + '$^oC$'
+                vmin = -5; vmax=5
+                cmap = cmap_bias
+            elif plot_type == 'response':
+                if exp == 'unparameterized':
+                    data = select(self[exp].thetao - self[exp].woa_temp)
+                    rmse = float(np.sqrt(np.nanmean(data**2)))
+                    label = label + ' bias' + '\n RMSE=%.2f' % rmse + '$^oC$'
+                    bias = data.copy()
+                else:
+                    data = select(self[exp].thetao - self['unparameterized'].thetao)
+                    corr = xr.corr(data,bias)
+                    rmse = float(np.sqrt(np.nanmean((data+bias)**2)))
+                    label = label + ' response' + '\n RMSE=%.2f$^oC$, \nCorr=%.2f' % (rmse, corr)
+                vmin = -5; vmax=5
+                cmap = cmap_bias
+
+            im=data.plot.pcolormesh(ax=ax, rasterized=True, cmap=cmap, add_colorbar=False, vmin=vmin, vmax=vmax)
+            ax.set_title(label)
+            ax.set_ylim([1,6500])
+            ax.set_yscale('log')
+            ax.invert_yaxis()
+            plt.ylabel('Depth, m')
+            plt.xlabel('Latitude')
+
+
+        plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')
