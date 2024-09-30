@@ -141,7 +141,7 @@ class CollectionOfExperiments:
         plt.tight_layout()
         plt.legend(bbox_to_anchor=(1.5,1))
 
-    def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='3D'):
+    def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='3D', plot_type = 'default'):
         default_rcParams({'font.size': 10})
         labels, nrows, ncol = init_subplots(exps, labels, ncols=2)
         
@@ -159,8 +159,27 @@ class CollectionOfExperiments:
             gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='-')
             gl.top_labels = False
             gl.right_labels = False
-            data = select(self[exp].thetao).isel(zl=zl)
-            im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=0, vmax=30)
-            ax.set_title(labels[ifig])
+            if projection is not ccrs.Robinson():
+                ax.coastlines()
+
+            if plot_type == 'default':
+                data = self[exp].thetao
+                vmin = 0; vmax=30
+            elif plot_type == 'bias':
+                data = self[exp].thetao - self[exp].woa_temp
+                vmin = -5; vmax=5
+            elif plot_type == 'response':
+                data = self[exp].thetao - self['unparameterized'].thetao
+                vmin = -5; vmax=5
+
+            data = select(data).isel(zl=zl)
+
+            im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=vmin, vmax=vmax)
+            label = labels[ifig]
+            if plot_type == 'bias':
+                rmse = float(np.sqrt(np.nanmean(data**2)))
+                label = label + '\n RMSE=%.2f' % rmse + '$^oC$'
+
+            ax.set_title(label)
 
         plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')
