@@ -149,7 +149,7 @@ class CollectionOfExperiments:
         cmap = cmocean.cm.balance
         cmap.set_bad('gray', alpha=1)
 
-        if projection is '3D':
+        if projection is '3D' and select==select_globe:
             projection = ccrs.Robinson()
         else:
             projection = ccrs.PlateCarree()
