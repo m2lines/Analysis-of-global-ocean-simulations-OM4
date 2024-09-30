@@ -28,7 +28,7 @@ def y_coord(array):
 
 def sort_longitude(x):
     lon = x_coord(x)
-    x[lon.name] = np.where(lon>0, lon, 360+lon)
+    x[lon.name] = np.where(lon>-180, lon, lon+360)
     x = x.sortby(lon.name)
     return x
 

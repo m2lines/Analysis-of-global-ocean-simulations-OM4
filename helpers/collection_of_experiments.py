@@ -150,11 +150,10 @@ class CollectionOfExperiments:
         cmap.set_bad('gray', alpha=1)
 
         for ifig, exp in enumerate(exps):
-            ax = fig.add_subplot(nrows,ncol,ifig+1,projection=ccrs.Robinson(central_longitude=-180))
-            gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='--')
-            #ax.coastlines()
+            ax = fig.add_subplot(nrows,ncol,ifig+1,projection=ccrs.Robinson())
+            gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='-')
             gl.top_labels = False
-            gl.top_labels = False  
+            gl.right_labels = False
             data = select(self[exp].thetao).isel(zl=zl)
             im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=0, vmax=30)
             ax.set_global()
