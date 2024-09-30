@@ -159,8 +159,33 @@ class Experiment:
         woa_interp[{'zl':0}] = woa[{'depth':0}]
         return woa_interp.squeeze().drop_vars(['time', 'depth'])
     
+    @cached_property
+    def MLD_summer_obs(self):
+        obs = np.load('../data/mod_r6_cycle1_MLE1_zgrid_MLD_003_min.npy', allow_pickle='TRUE').item()
+        obs = sort_longitude(xr.DataArray(obs['obs'], dims=['xh', 'yh'], coords={'xh':obs['lon'], 'yh':obs['lat']})).T
+        return remesh(obs, self.woa_temp)
+    
+    @cached_property
+    def MLD_winter_obs(self):
+        obs = np.load('../data/mod_r6_cycle1_MLE1_zgrid_MLD_003_max.npy', allow_pickle='TRUE').item()
+        obs = sort_longitude(xr.DataArray(obs['obs'], dims=['xh', 'yh'], coords={'xh':obs['lon'], 'yh':obs['lat']})).T
+        return remesh(obs, self.woa_temp)
+    
     @netcdf_property
     def thetao(self):
         out = self.ocean_month_z.thetao.sel(time=self.Averaging_time).mean('time')
         out = remesh(out, self.woa_temp)
         return xr.where(np.isnan(self.woa_temp), np.nan, out)
+    
+    @netcdf_property
+    def MLD_summer(self):
+        MLD_003 = remesh(self.ocean_month.MLD_003, self.woa_temp).sel(time=self.Averaging_time)
+        MLD_003_month = MLD_003.groupby('time.month').mean('time')
+        return MLD_003_month.min('month')
+    
+    @netcdf_property
+    def MLD_winter(self):
+        MLD_003 = remesh(self.ocean_month.MLD_003, self.woa_temp).sel(time=self.Averaging_time)
+        MLD_003_month = MLD_003.groupby('time.month').mean('time')
+        return MLD_003_month.max('month')
+    

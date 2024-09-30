@@ -141,17 +141,22 @@ class CollectionOfExperiments:
         plt.tight_layout()
         plt.legend(bbox_to_anchor=(1.5,1))
 
-    def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default'):
-        default_rcParams({'font.size': 10})
+    def plot_map(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', 
+                 cmap_bias = cmocean.cm.balance, cmap_field=cmocean.cm.thermal,
+                 field = lambda x: x.thetao.isel(zl=0), 
+                 target = lambda x: x.woa_temp.isel(zl=0),
+                 scale = '$^oC$', cmap_label = 'Temperature, $^oC$',
+                 range_field=(0,30), range_bias=(-5,5)):
+        '''
+        Generic function for plotting 2D fields
+        '''
+        default_rcParams({'font.size': 8})
         labels, nrows, ncol = init_subplots(exps, labels, ncols=2)
-        print('Depth = ', float(self[exps[0]].thetao.zl[zl]))
         
         fig = plt.figure(figsize=(4*ncol, 2*nrows), layout='constrained', dpi=200)
-        cmap_bias = cmocean.cm.balance
-        cmap_bias.set_bad('gray', alpha=1)
-
-        cmap_temp = cmocean.cm.thermal
-        cmap_temp.set_bad('gray', alpha=1)
+        
+        cmap_bias.set_bad('white', alpha=1)
+        cmap_field.set_bad('white', alpha=1)
 
         if projection is '3D':
             projection = ccrs.Robinson()
@@ -166,38 +171,63 @@ class CollectionOfExperiments:
             gl.top_labels = False
             gl.right_labels = False
             if isinstance(projection, ccrs.PlateCarree):
-                ax.coastlines()
+                ax.coastlines(zorder=101)
             
             label = labels[ifig]
             if plot_type == 'default':
-                data = select(self[exp].thetao).isel(zl=zl)
-                vmin = 0; vmax=30
-                cmap = cmap_temp
+                data = select(field(self[exp]))
+                vmin, vmax = range_field[0:2]
+                cmap = cmap_field
             elif plot_type == 'bias':
-                data = select(self[exp].thetao - self[exp].woa_temp).isel(zl=zl)
+                data = select(field(self[exp]) - target(self[exp]))
                 rmse = float(np.sqrt(np.nanmean(data**2)))
-                label = label + '\n RMSE=%.2f' % rmse + '$^oC$'
-                vmin = -5; vmax=5
+                label = label + f'\n RMSE=%.2f{scale}' % rmse
+                vmin, vmax = range_bias[0:2]
                 cmap = cmap_bias
             elif plot_type == 'response':
                 if exp == 'unparameterized':
-                    data = select(self[exp].thetao - self[exp].woa_temp).isel(zl=zl)
+                    data = select(field(self[exp]) - target(self[exp]))
                     rmse = float(np.sqrt(np.nanmean(data**2)))
-                    label = label + ' bias' + '\n RMSE=%.2f' % rmse + '$^oC$'
+                    label = label + ' bias' + f'\n RMSE=%.2f{scale}' % rmse
                     bias = data.copy()
                 else:
-                    data = select(self[exp].thetao - self['unparameterized'].thetao).isel(zl=zl)
+                    data = select(field(self[exp])- field(self['unparameterized']))
                     corr = xr.corr(data,bias)
                     rmse = float(np.sqrt(np.nanmean((data+bias)**2)))
-                    label = label + ' response' + '\n RMSE=%.2f$^oC$, \nCorr=%.2f' % (rmse, corr)
-                vmin = -5; vmax=5
+                    label = label + ' response' + f'\n RMSE=%.2f{scale}, \nCorr=%.2f' % (rmse, corr)
+                vmin, vmax = range_bias[0:2]
                 cmap = cmap_bias
 
             im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=vmin, vmax=vmax)
             ax.set_title(label)
+            ax.add_feature(cfeature.LAND, color='gray', zorder=100)
 
-        plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')
+        plt.colorbar(im,ax=fig.axes, label=cmap_label)
 
+    def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default'):
+        self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
+                    cmap_bias = cmocean.cm.balance, cmap_field=cmocean.cm.thermal,
+                    field = lambda x: x.thetao.isel(zl=zl), 
+                    target = lambda x: x.woa_temp.isel(zl=zl),
+                    scale = '$^oC$', cmap_label = 'Temperature, $^oC$',
+                    range_field=(0,30), range_bias=(-5,5))
+        
+    def plot_MLD_summer(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default'):
+        self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
+                    cmap_bias = plt.cm.RdYlBu, cmap_field=plt.cm.BuPu,
+                    field = lambda x: x.MLD_summer, 
+                    target = lambda x: x.MLD_summer_obs,
+                    scale = 'm', cmap_label = 'Summer MLD, metres',
+                    range_field=(0,80), range_bias=(-20,20))
+        
+    def plot_MLD_winter(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default'):
+        self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
+                    cmap_bias = plt.cm.RdYlBu, cmap_field=plt.cm.BuPu,
+                    field = lambda x: x.MLD_winter, 
+                    target = lambda x: x.MLD_winter_obs,
+                    scale = 'm', cmap_label = 'Winter MLD, metres',
+                    range_field=(0,300), range_bias=(-100,100))
+        
     def plot_temp_section(self, exps, labels=None, select=select_Drake, plot_type = 'default'):
         default_rcParams({'font.size': 10})
         labels, nrows, ncol = init_subplots(exps, labels, ncols=2)
