@@ -86,19 +86,21 @@ def select_globe(array):
 def select_Equator(array):
     return select_LatLon(array, Lat=(-20,20), Lon=(0,360))
 
-def select_Gulf_Juricke(array):
+# Juricke regions below:
+
+def select_Gulf(array):
     return select_LatLon(array, Lat=(30, 60), Lon=(-80,-20))
 
-def select_Kuroshio_Juricke(array):
+def select_Kuroshio(array):
     return select_LatLon(array, Lat=(20, 50), Lon=(120,180))
 
-def select_SO_Juricke(array):
+def select_SO(array):
     return select_LatLon(array, Lat=(-70,-30), Lon=(0,360))
 
-def select_Aghulas_Juricke(array):
+def select_Aghulas(array):
     return select_LatLon(array, Lat=(-60,-30), Lon=(0,60))
 
-def select_Malvinas_Juricke(array):
+def select_Malvinas(array):
     return select_LatLon(array, Lat=(-60,-30), Lon=(-60,0))
 
 def remesh(input, target, fillna=False):

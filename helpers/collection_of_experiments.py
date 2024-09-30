@@ -141,45 +141,59 @@ class CollectionOfExperiments:
         plt.tight_layout()
         plt.legend(bbox_to_anchor=(1.5,1))
 
-    def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='3D', plot_type = 'default'):
+    def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default'):
         default_rcParams({'font.size': 10})
         labels, nrows, ncol = init_subplots(exps, labels, ncols=2)
+        print('Depth = ', float(self[exps[0]].thetao.zl[zl]))
         
         fig = plt.figure(figsize=(4*ncol, 2*nrows), layout='constrained', dpi=200)
-        cmap = cmocean.cm.balance
-        cmap.set_bad('gray', alpha=1)
+        cmap_bias = cmocean.cm.balance
+        cmap_bias.set_bad('gray', alpha=1)
 
-        if projection is '3D' and select==select_globe:
+        cmap_temp = cmocean.cm.thermal
+        cmap_temp.set_bad('gray', alpha=1)
+
+        if projection is '3D':
             projection = ccrs.Robinson()
-        else:
+        elif projection is '2D':
             projection = ccrs.PlateCarree()
+        else:
+            print('Specify projection as 2D or 3D')
         
         for ifig, exp in enumerate(exps):
             ax = fig.add_subplot(nrows,ncol,ifig+1,projection=projection)
             gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='-')
             gl.top_labels = False
             gl.right_labels = False
-            if projection is not ccrs.Robinson():
+            if isinstance(projection, ccrs.PlateCarree):
                 ax.coastlines()
-
-            if plot_type == 'default':
-                data = self[exp].thetao
-                vmin = 0; vmax=30
-            elif plot_type == 'bias':
-                data = self[exp].thetao - self[exp].woa_temp
-                vmin = -5; vmax=5
-            elif plot_type == 'response':
-                data = self[exp].thetao - self['unparameterized'].thetao
-                vmin = -5; vmax=5
-
-            data = select(data).isel(zl=zl)
-
-            im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=vmin, vmax=vmax)
+            
             label = labels[ifig]
-            if plot_type == 'bias':
+            if plot_type == 'default':
+                data = select(self[exp].thetao).isel(zl=zl)
+                vmin = 0; vmax=30
+                cmap = cmap_temp
+            elif plot_type == 'bias':
+                data = select(self[exp].thetao - self[exp].woa_temp).isel(zl=zl)
                 rmse = float(np.sqrt(np.nanmean(data**2)))
                 label = label + '\n RMSE=%.2f' % rmse + '$^oC$'
+                vmin = -5; vmax=5
+                cmap = cmap_bias
+            elif plot_type == 'response':
+                if exp == 'unparameterized':
+                    data = select(self[exp].thetao - self[exp].woa_temp).isel(zl=zl)
+                    rmse = float(np.sqrt(np.nanmean(data**2)))
+                    label = label + ' bias' + '\n RMSE=%.2f' % rmse + '$^oC$'
+                    bias = data.copy()
+                else:
+                    data = select(self[exp].thetao - self['unparameterized'].thetao).isel(zl=zl)
+                    corr = xr.corr(data,bias)
+                    rmse = float(np.sqrt(np.nanmean((data+bias)**2)))
+                    label = label + ' response' + '\n RMSE=%.2f$^oC$, \nCorr=%.2f' % (rmse, corr)
+                vmin = -5; vmax=5
+                cmap = cmap_bias
 
+            im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=vmin, vmax=vmax)
             ax.set_title(label)
 
         plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')
