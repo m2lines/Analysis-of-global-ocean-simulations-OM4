@@ -26,7 +26,7 @@ def y_coord(array):
         if name in array.dims:
             return array[name]
 
-def sort_longitude(x, lon_min=None):
+def sort_longitude(x, lon_min=-180.):
     if lon_min is None:
         return x
     lon_max=lon_min + 360.
@@ -87,7 +87,7 @@ def select_Equator(array):
     return select_LatLon(array, Lat=(-20,20), Lon=(0,360))
 
 def select_Gulf_Juricke(array):
-    return select_LatLon(array, Lat=(30, 60), Lon=(-80+360,-20+360))
+    return select_LatLon(array, Lat=(30, 60), Lon=(-80,-20))
 
 def select_Kuroshio_Juricke(array):
     return select_LatLon(array, Lat=(20, 50), Lon=(120,180))
@@ -99,7 +99,7 @@ def select_Aghulas_Juricke(array):
     return select_LatLon(array, Lat=(-60,-30), Lon=(0,60))
 
 def select_Malvinas_Juricke(array):
-    return select_LatLon(array, Lat=(-60,-30), Lon=(300,360))
+    return select_LatLon(array, Lat=(-60,-30), Lon=(-60,0))
 
 def remesh(input, target, fillna=False):
     '''

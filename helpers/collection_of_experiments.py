@@ -141,7 +141,7 @@ class CollectionOfExperiments:
         plt.tight_layout()
         plt.legend(bbox_to_anchor=(1.5,1))
 
-    def plot_temp(self, exps, labels=None, zl=0, select=select_globe):
+    def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='3D'):
         default_rcParams({'font.size': 10})
         labels, nrows, ncol = init_subplots(exps, labels, ncols=2)
         
@@ -149,8 +149,13 @@ class CollectionOfExperiments:
         cmap = cmocean.cm.balance
         cmap.set_bad('gray', alpha=1)
 
+        if projection is '3D':
+            projection = ccrs.Robinson()
+        else:
+            projection = ccrs.PlateCarree()
+        
         for ifig, exp in enumerate(exps):
-            ax = fig.add_subplot(nrows,ncol,ifig+1,projection=ccrs.Robinson())
+            ax = fig.add_subplot(nrows,ncol,ifig+1,projection=projection)
             gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='-')
             gl.top_labels = False
             gl.right_labels = False

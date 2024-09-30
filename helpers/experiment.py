@@ -154,7 +154,7 @@ class Experiment:
         WOA temperature data on its native horizontal 1x1 grid
         and vertical grid of MOM6 output
         '''
-        woa = xr.open_dataset('/vast/pp2681/WOA/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({})
+        woa = sort_longitude(xr.open_dataset('/vast/pp2681/WOA/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({}))
         woa_interp = woa.interp(depth=self.ocean_month_z.zl)
         woa_interp[{'zl':0}] = woa[{'depth':0}]
         return woa_interp.squeeze().drop_vars(['time', 'depth'])
