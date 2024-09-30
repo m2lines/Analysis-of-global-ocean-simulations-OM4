@@ -156,7 +156,6 @@ class CollectionOfExperiments:
             gl.right_labels = False
             data = select(self[exp].thetao).isel(zl=zl)
             im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=0, vmax=30)
-            ax.set_global()
             ax.set_title(labels[ifig])
 
         plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')

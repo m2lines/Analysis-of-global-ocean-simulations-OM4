@@ -26,9 +26,18 @@ def y_coord(array):
         if name in array.dims:
             return array[name]
 
-def sort_longitude(x):
+def sort_longitude(x, lon_min=None):
+    if lon_min is None:
+        return x
+    lon_max=lon_min + 360.
     lon = x_coord(x)
-    x[lon.name] = np.where(lon>-180, lon, lon+360)
+    if lon.min() < lon_min:
+        lon = xr.where(lon<lon_min, lon+360, lon)
+        lon = xr.where(lon>lon_max, lon-360, lon)
+    else:
+        lon = xr.where(lon>lon_max, lon-360, lon)
+        lon = xr.where(lon<lon_min, lon+360, lon)   
+    x[lon.name] = lon.values
     x = x.sortby(lon.name)
     return x
 
@@ -63,7 +72,7 @@ def select_LatLon(array, Lat=(35,45), Lon=(5,15)):
                       y.name: slice(Lat[0],Lat[1])})
 
 def select_NA(array):
-    return select_LatLon(array, Lat=(20, 60), Lon=(260,330))
+    return select_LatLon(array, Lat=(20, 60), Lon=(260-360,330-360))
 
 def select_Pacific(array):
     return select_LatLon(array, Lat=(10, 65), Lon=(-250+360,-130+360))
