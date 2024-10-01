@@ -174,35 +174,41 @@ class CollectionOfExperiments:
                 ax.coastlines(zorder=101)
             
             label = labels[ifig]
-            if plot_type == 'default':
+            
+            if exp == 'obs':
+                data = select(target(self['unparameterized']))
+                vmin, vmax = range_field[0:2]
+                cmap = cmap_field
+            elif plot_type == 'default':
                 data = select(field(self[exp]))
                 vmin, vmax = range_field[0:2]
                 cmap = cmap_field
             elif plot_type == 'bias':
                 data = select(field(self[exp]) - target(self[exp]))
                 rmse = float(np.sqrt(np.nanmean(data**2)))
-                label = label + f'\n RMSE=%.2f{scale}' % rmse
+                label = label + f'\n RMSE=%.3f{scale}' % rmse
                 vmin, vmax = range_bias[0:2]
                 cmap = cmap_bias
             elif plot_type == 'response':
                 if exp == 'unparameterized':
                     data = select(field(self[exp]) - target(self[exp]))
                     rmse = float(np.sqrt(np.nanmean(data**2)))
-                    label = label + ' bias' + f'\n RMSE=%.2f{scale}' % rmse
+                    label = label + ' bias' + f'\n RMSE=%.3f{scale}' % rmse
                     bias = data.copy()
                 else:
                     data = select(field(self[exp])- field(self['unparameterized']))
-                    corr = xr.corr(data,bias)
+                    corr = - np.nanmean(bias * data) / np.sqrt(np.nanmean(bias**2) * np.nanmean(data**2))
+                    attenuation = - np.nanmean(bias * data) / np.nanmean(data**2)
                     rmse = float(np.sqrt(np.nanmean((data+bias)**2)))
-                    label = label + ' response' + f'\n RMSE=%.2f{scale}, \nCorr=%.2f' % (rmse, corr)
+                    label = label + ' response' + f'\n RMSE=%.3f{scale}, Corr=%.2f\n to atenuate=%.1f' % (rmse, corr, attenuation)
                 vmin, vmax = range_bias[0:2]
                 cmap = cmap_bias
 
-            im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), rasterized=True, cmap=cmap, add_colorbar=False, vmin=vmin, vmax=vmax)
+            im=data.plot.pcolormesh(ax=ax, transform=ccrs.PlateCarree(), 
+                                    rasterized=True, cmap=cmap, add_colorbar=True, vmin=vmin, vmax=vmax,
+                                    cbar_kwargs={'label':cmap_label})
             ax.set_title(label)
             ax.add_feature(cfeature.LAND, color='gray', zorder=100)
-
-        plt.colorbar(im,ax=fig.axes, label=cmap_label)
 
     def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default'):
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
@@ -251,7 +257,11 @@ class CollectionOfExperiments:
             ax = fig.add_subplot(nrows,ncol,ifig+1)
             
             label = labels[ifig]
-            if plot_type == 'default':
+            if exp == 'obs':
+                data = select(self['unparameterized'].woa_temp)
+                vmin = 0; vmax=30
+                cmap = cmap_temp
+            elif plot_type == 'default':
                 data = select(self[exp].thetao)
                 vmin = 0; vmax=30
                 cmap = cmap_temp
@@ -269,19 +279,18 @@ class CollectionOfExperiments:
                     bias = data.copy()
                 else:
                     data = select(self[exp].thetao - self['unparameterized'].thetao)
-                    corr = xr.corr(data,bias)
+                    corr = - np.nanmean(bias * data) / np.sqrt(np.nanmean(bias**2) * np.nanmean(data**2))
+                    attenuation = - np.nanmean(bias * data) / np.nanmean(data**2)
                     rmse = float(np.sqrt(np.nanmean((data+bias)**2)))
-                    label = label + ' response' + '\n RMSE=%.2f$^oC$, \nCorr=%.2f' % (rmse, corr)
+                    label = label + ' response' + f'\n RMSE=%.3f$^oC$, Corr=%.2f\n to atenuate=%.1f' % (rmse, corr, attenuation)
                 vmin = -5; vmax=5
                 cmap = cmap_bias
 
-            im=data.plot.pcolormesh(ax=ax, rasterized=True, cmap=cmap, add_colorbar=False, vmin=vmin, vmax=vmax)
+            im=data.plot.pcolormesh(ax=ax, rasterized=True, cmap=cmap, add_colorbar=True, vmin=vmin, vmax=vmax,
+                                    cbar_kwargs={'label':'Temperature, $^oC$'})
             ax.set_title(label)
             ax.set_ylim([1,6500])
             ax.set_yscale('log')
             ax.invert_yaxis()
             plt.ylabel('Depth, m')
             plt.xlabel('Latitude')
-
-
-        plt.colorbar(im,ax=fig.axes, label='Temperature, $^oC$')
