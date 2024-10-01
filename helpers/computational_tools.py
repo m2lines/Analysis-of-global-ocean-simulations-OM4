@@ -424,7 +424,8 @@ def Lk_error(input, target, normalize=False, k=2):
 
     return list(np.atleast_1d(result))
 
-def compare(tested, control, mask=None, vmax=None, vmin = None, selector=select_NA, cmap=cmocean.cm.balance, time=-1, zl=0):
+def compare(tested, control, mask=None, vmax=None, vmin = None, selector=select_NA, cmap=cmocean.cm.balance, time=-1, zl=0,
+            label_test = 'Tested field', label_control = 'Control field'):
     if mask is not None:
         mask_nan = mask.data.copy()
         mask_nan[mask_nan==0.] = np.nan
@@ -457,18 +458,18 @@ def compare(tested, control, mask=None, vmax=None, vmin = None, selector=select_
     
     central_latitude = float(y_coord(control).mean())
     central_longitude = float(x_coord(control).mean())
-    fig, axes = plt.subplots(2,2, figsize=(12, 10), subplot_kw={'projection': ccrs.Orthographic(central_latitude=central_latitude, central_longitude=central_longitude)})
+    fig, axes = plt.subplots(2,2, figsize=(12, 7), subplot_kw={'projection': ccrs.Orthographic(central_latitude=central_latitude, central_longitude=central_longitude)})
     cmap.set_bad('gray')
     
     ax = axes[0][0]; ax.coastlines(); gl = ax.gridlines(); gl.bottom_labels=True; gl.left_labels=True;
     im = tested.plot(ax=ax, vmax=vmax, vmin=vmin, transform=ccrs.PlateCarree(), cmap=cmap, add_colorbar=False)
-    ax.set_title('Tested field')
+    ax.set_title(label_test)
     ax = axes[0][1]; ax.coastlines(); gl = ax.gridlines(); gl.bottom_labels=True; gl.left_labels=True;
     control.plot(ax=ax, vmax=vmax, vmin=vmin, transform=ccrs.PlateCarree(), cmap=cmap, add_colorbar=False)
-    ax.set_title('Control field')
+    ax.set_title(label_control)
     ax = axes[1][0]; ax.coastlines(); gl = ax.gridlines(); gl.bottom_labels=True; gl.left_labels=True;
     (tested-control).plot(ax=ax, vmax=vmax-control_mean, vmin=vmin-control_mean, transform=ccrs.PlateCarree(), cmap=cmap, add_colorbar=False)
-    ax.set_title('Tested-control')
+    ax.set_title(f'{label_test}-{label_control}')
     plt.tight_layout()
     plt.colorbar(im, ax=axes, shrink=0.9, aspect=30, extend='both')
     axes[1][1].remove()
