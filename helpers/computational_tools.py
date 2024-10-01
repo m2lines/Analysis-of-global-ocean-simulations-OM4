@@ -7,6 +7,9 @@ import xarray as xr
 import os
 import gcm_filters
 import xgcm
+import cmocean
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 
 def x_coord(array):
     '''
@@ -75,7 +78,7 @@ def select_NA(array):
     return select_LatLon(array, Lat=(20, 60), Lon=(260-360,330-360))
 
 def select_NA_large(array):
-    return select_LatLon(array, Lat=(20, 90), Lon=(-80,20))
+    return select_LatLon(array, Lat=(20, 70), Lon=(-80,20))
 
 def select_Pacific(array):
     return select_LatLon(array, Lat=(10, 65), Lon=(-250+360,-130+360))
@@ -178,25 +181,13 @@ def remesh(input, target, fillna=False):
     return result
 
 def create_grid_global(param):
-    '''
-    Depending on the dataset (2D or 3D), 
-    return different grid object
-    '''
-    if 'zl' not in param.dims:
-        grid = xgcm.Grid(param, coords={
-            'X': {'center': 'xh', 'right': 'xq'},
-            'Y': {'center': 'yh', 'right': 'yq'}
-        },
-        boundary={"X": 'periodic', 'Y': 'fill'},
-        fill_value = {'Y':0})
-    else:
-        grid = xgcm.Grid(param, coords={
-            'X': {'center': 'xh', 'right': 'xq'},
-            'Y': {'center': 'yh', 'right': 'yq'},
-            'Z': {'center': 'zl', 'outer': 'zi'}
-        },
-        boundary={"X": 'periodic', 'Y': 'fill', 'Z': 'fill'},
-        fill_value = {'Y': 0, 'Z': 0})
+    grid = xgcm.Grid(param, coords={
+        'X': {'center': 'xh', 'right': 'xq'},
+        'Y': {'center': 'yh', 'right': 'yq'}
+    },
+    boundary={"X": 'periodic', 'Y': 'fill'},
+    fill_value = {'Y':0})
+
     return grid
 
 def compute_isotropic_KE(u_in, v_in, dx, dy, Lat=(35,45), Lon=(5,15), window='hann', 
@@ -423,3 +414,67 @@ def Lk_error(input, target, normalize=False, k=2):
         result = result / lk_norm(target,k)
 
     return list(np.atleast_1d(result))
+
+def compare(tested, control, mask=None, vmax=None, vmin = None, selector=select_NA, cmap=cmocean.cm.balance, time=-1, zl=0):
+    if mask is not None:
+        mask_nan = mask.data.copy()
+        mask_nan[mask_nan==0.] = np.nan
+        mask_nan = mask_nan + mask*0
+        tested = tested * mask_nan
+        control = control * mask_nan
+    tested = selector(remesh(tested,control))
+    control = selector(control)
+
+    if 'time' in tested.dims:
+        tested = tested.isel(time=time)
+        control = control.isel(time=time)
+
+    if 'zl' in tested.dims:
+        tested = tested.isel(zl=zl)
+        control = control.isel(zl=zl)
+
+    tested = tested.compute()
+    control = control.compute()
+    
+    if vmax is None:
+        control_mean = control.mean()
+        control_std = control.std()
+        vmax = control_mean + control_std * 4
+        vmin = control_mean - control_std * 4
+    else:
+        control_mean = 0.
+        if vmin is None:
+            vmin = - vmax
+    
+    central_latitude = float(y_coord(control).mean())
+    central_longitude = float(x_coord(control).mean())
+    fig, axes = plt.subplots(2,2, figsize=(12, 10), subplot_kw={'projection': ccrs.Orthographic(central_latitude=central_latitude, central_longitude=central_longitude)})
+    cmap.set_bad('gray')
+    
+    ax = axes[0][0]; ax.coastlines(); gl = ax.gridlines(); gl.bottom_labels=True; gl.left_labels=True;
+    im = tested.plot(ax=ax, vmax=vmax, vmin=vmin, transform=ccrs.PlateCarree(), cmap=cmap, add_colorbar=False)
+    ax.set_title('Tested field')
+    ax = axes[0][1]; ax.coastlines(); gl = ax.gridlines(); gl.bottom_labels=True; gl.left_labels=True;
+    control.plot(ax=ax, vmax=vmax, vmin=vmin, transform=ccrs.PlateCarree(), cmap=cmap, add_colorbar=False)
+    ax.set_title('Control field')
+    ax = axes[1][0]; ax.coastlines(); gl = ax.gridlines(); gl.bottom_labels=True; gl.left_labels=True;
+    (tested-control).plot(ax=ax, vmax=vmax-control_mean, vmin=vmin-control_mean, transform=ccrs.PlateCarree(), cmap=cmap, add_colorbar=False)
+    ax.set_title('Tested-control')
+    plt.tight_layout()
+    plt.colorbar(im, ax=axes, shrink=0.9, aspect=30, extend='both')
+    axes[1][1].remove()
+    
+    ########## Metrics ##############
+    error = tested-control
+    relative_error = np.abs(error).mean() / np.abs(control).mean()
+    R2 = 1 - (error**2).mean() / (control**2).mean()
+    optimal_scaling = (tested*control).mean() / (tested**2).mean()
+    error = tested * optimal_scaling - control
+    R2_max = 1 - (error**2).mean() / (control**2).mean()
+    corr = xr.corr(tested, control)
+    print('Correlation:', float(corr))
+    print('Relative Error:', float(relative_error))
+    print('R2 = ', float(R2))
+    print('R2 max = ', float(R2_max))
+    print('Optinal scaling:', float(optimal_scaling))
+    print(f'Nans [test/control]: [{int(np.sum(np.isnan(tested)))}, {int(np.sum(np.isnan(control)))}]')

@@ -100,9 +100,7 @@ class Experiment:
 
     @cached_property
     def param(self):
-        result = sort_longitude(xr.open_dataset(os.path.join(self.folder, 'ocean_geometry.nc')).rename(
-                {'latq': 'yq', 'lonq': 'xq', 'lath': 'yh', 'lonh': 'xh'} # change coordinates notation as in other files
-            ))
+        result = sort_longitude(xr.open_dataset('../data/ocean_static.nc')).drop_vars('time')
         rename_coordinates(result)
         return result
 
@@ -202,3 +200,38 @@ class Experiment:
         ssh = self.ocean_daily.zos.sel(time=self.Averaging_time)
         return remesh(ssh.std('time'), self.woa_temp)
     
+    @cached_property
+    def geoU(self):
+        '''
+        u = - g / f * d ssh/dy
+        '''
+        Omega = 7.2921e-5
+        g = 9.8
+        deg_to_rad = np.pi / 180 # degrees to radians factor
+        fq = 2 * Omega * np.sin(self.param.yq * deg_to_rad)
+        grid = create_grid_global(self.param)
+
+        hy = grid.diff(self.ocean_daily.zos, 'Y') / self.param.dyCv
+        
+        u = grid.interp(- g / fq * hy, 'Y')
+        u = xr.where(np.abs(u.yh)<10, np.nan, u)
+
+        return u.chunk({'yh':-1,'xh':-1,'time':1})
+
+    @cached_property
+    def geoV(self):
+        '''
+        v = + g / f * d ssh/dx
+        '''
+        Omega = 7.2921e-5
+        g = 9.8
+        deg_to_rad = np.pi / 180 # degrees to radians factor
+        fh = 2 * Omega * np.sin(self.param.yh * deg_to_rad)
+        grid = create_grid_global(self.param)
+
+        hx = grid.diff(self.ocean_daily.zos, 'X') / self.param.dxCu
+        
+        v = grid.interp(+ g / fh * hx, 'X')
+        v = xr.where(np.abs(v.yh)<10, np.nan, v)
+
+        return v.chunk({'yh':-1,'xh':-1,'time':1})
