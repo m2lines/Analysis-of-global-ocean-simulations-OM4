@@ -158,9 +158,9 @@ class CollectionOfExperiments:
         cmap_bias.set_bad('white', alpha=1)
         cmap_field.set_bad('white', alpha=1)
 
-        if projection is '3D':
+        if projection == '3D':
             projection = ccrs.Robinson()
-        elif projection is '2D':
+        elif projection == '2D':
             projection = ccrs.PlateCarree()
         else:
             print('Specify projection as 2D or 3D')
@@ -227,6 +227,14 @@ class CollectionOfExperiments:
                     target = lambda x: x.MLD_winter_obs,
                     scale = 'm', cmap_label = 'Winter MLD, metres',
                     range_field=(0,300), range_bias=(-100,100))
+        
+    def plot_ssh_std(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default'):
+        self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
+                    cmap_bias = plt.cm.seismic, cmap_field=cmocean.cm.amp,
+                    field = lambda x: x.ssh_std, 
+                    target = lambda x: x.ssh_std_obs,
+                    scale = 'm', cmap_label = 'STD SSH, m',
+                    range_field=(0,0.3), range_bias=(-0.1,0.1))
         
     def plot_temp_section(self, exps, labels=None, select=select_Drake, plot_type = 'default'):
         default_rcParams({'font.size': 10})

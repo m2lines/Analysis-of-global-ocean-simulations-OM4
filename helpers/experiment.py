@@ -154,7 +154,7 @@ class Experiment:
         WOA temperature data on its native horizontal 1x1 grid
         and vertical grid of MOM6 output
         '''
-        woa = sort_longitude(xr.open_dataset('/vast/pp2681/WOA/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({}))
+        woa = sort_longitude(xr.open_dataset('../data/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({}))
         woa_interp = woa.interp(depth=self.ocean_month_z.zl)
         woa_interp[{'zl':0}] = woa[{'depth':0}]
         return woa_interp.squeeze().drop_vars(['time', 'depth'])
@@ -170,6 +170,14 @@ class Experiment:
         obs = np.load('../data/mod_r6_cycle1_MLE1_zgrid_MLD_003_max.npy', allow_pickle='TRUE').item()
         obs = sort_longitude(xr.DataArray(obs['obs'], dims=['xh', 'yh'], coords={'xh':obs['lon'], 'yh':obs['lat']})).T
         return remesh(obs, self.woa_temp)
+    
+    @cached_property
+    def ssh_std_obs(self):
+        '''
+        Copernicus data
+        '''
+        obs = sort_longitude(xr.open_dataset('../data/ssh_std_obs.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).adt.chunk({}))
+        return obs
     
     @netcdf_property
     def thetao(self):
@@ -188,4 +196,9 @@ class Experiment:
         MLD_003 = remesh(self.ocean_month.MLD_003, self.woa_temp).sel(time=self.Averaging_time)
         MLD_003_month = MLD_003.groupby('time.month').mean('time')
         return MLD_003_month.max('month')
+    
+    @netcdf_property
+    def ssh_std(self):
+        ssh = self.ocean_daily.zos.sel(time=self.Averaging_time)
+        return remesh(ssh.std('time'), self.woa_temp)
     
