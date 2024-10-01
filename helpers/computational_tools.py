@@ -19,7 +19,16 @@ def x_coord(array):
     for name in ['xh', 'xq', 'lon']:
         if name in array.dims:
             return array[name]
-
+            
+def x_coord_iterator(array):
+    '''
+    Returns horizontal coordinate, 'xq', 'xh' or 'lon'
+    as xarray
+    '''
+    for name in ['xh', 'xq', 'lon']:
+        if name in array.dims:
+            yield array[name]
+            
 def y_coord(array):
     '''
     Returns horizontal coordinate, 'yq' or 'yh'
@@ -33,15 +42,15 @@ def sort_longitude(x, lon_min=-180.):
     if lon_min is None:
         return x
     lon_max=lon_min + 360.
-    lon = x_coord(x)
-    if lon.min() < lon_min:
-        lon = xr.where(lon<lon_min, lon+360, lon)
-        lon = xr.where(lon>lon_max, lon-360, lon)
-    else:
-        lon = xr.where(lon>lon_max, lon-360, lon)
-        lon = xr.where(lon<lon_min, lon+360, lon)   
-    x[lon.name] = lon.values
-    x = x.sortby(lon.name)
+    for lon in x_coord_iterator(x):
+        if lon.min() < lon_min:
+            lon = xr.where(lon<lon_min, lon+360, lon)
+            lon = xr.where(lon>lon_max, lon-360, lon)
+        else:
+            lon = xr.where(lon>lon_max, lon-360, lon)
+            lon = xr.where(lon<lon_min, lon+360, lon)   
+        x[lon.name] = lon.values
+        x = x.sortby(lon.name)
     return x
 
 def rename_coordinates(xr_dataset):

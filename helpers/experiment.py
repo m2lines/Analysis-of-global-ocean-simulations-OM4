@@ -235,3 +235,20 @@ class Experiment:
         v = xr.where(np.abs(v.yh)<10, np.nan, v)
 
         return v.chunk({'yh':-1,'xh':-1,'time':1})
+
+    @cached_property
+    def RV(self):
+        param = self.param
+        grid = create_grid_global(param)
+
+        dyCv = param.dyCv
+        dxCu = param.dxCu
+        IareaBu = 1. / param.areacello_bu
+
+        u = self.ocean_daily.ssu
+        v = self.ocean_daily.ssv
+
+        dvdx = grid.diff(v * dyCv,'X')
+        dudy = grid.diff(u * dxCu,'Y')
+
+        return (dvdx - dudy) * IareaBu
