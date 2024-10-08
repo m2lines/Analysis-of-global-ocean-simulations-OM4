@@ -111,9 +111,13 @@ class CollectionOfExperiments:
 
         return cls(exps, experiments_dict, names_dict)
     
-    def plot_series(self, exps, labels=None, colors=['gray', violet, 'tab:red', 'tab:green', 'tab:blue', 'tab:orange', 'tab:cyan', 'b', 'g', 'y']):
+    def plot_series(self, exps, labels=None, colors=['gray', violet, 'tab:red', 'tab:green', 'tab:blue', 'tab:orange', 'tab:cyan', 'b', 'g', 'y'], CFL=False):
         default_rcParams({'font.size':12})
-        plt.figure(figsize=(6,6))
+        if CFL:
+            nrows=3
+        else:
+            nrows=2
+        plt.figure(figsize=(6,nrows*3))
         if labels is None:
             labels=exps
         if colors is None:
@@ -124,7 +128,7 @@ class CollectionOfExperiments:
             ds['Time'] = ds['Time'] - ds['Time'][0]
             kw = {'lw':2, 'color':colors[j]}
             
-            plt.subplot(2,1,1)
+            plt.subplot(nrows,1,1)
             (ds.KE.sum('Layer')).plot(**kw)
             plt.xlabel('Years')
             plt.xticks(np.arange(6)*365,np.arange(6))
@@ -132,14 +136,25 @@ class CollectionOfExperiments:
             plt.ylabel('Kinetic energy, Joules')
             plt.ylim([0,6e+18])
 
-            plt.subplot(2,1,2)
+            plt.subplot(nrows,1,2)
             (ds.APE.sum('Interface')).plot(label=label, **kw)
             plt.xlabel('Years')
             plt.xticks(np.arange(6)*365,np.arange(6))
             plt.grid()
             plt.ylabel('Available potential energy, Joules')
+
+            if CFL:
+                plt.subplot(nrows,1,3)
+                ds.max_CFL_lin.plot(label=label,**kw)
+                plt.grid()
+                plt.ylim([0,0.5])
+                plt.xlabel('Years')
+                plt.xticks(np.arange(6)*365,np.arange(6))
+                plt.grid()
+                plt.ylabel('CFL number')
+        
         plt.tight_layout()
-        plt.legend(bbox_to_anchor=(1.5,1))
+        plt.legend(bbox_to_anchor=(1,1))
 
     def plot_map(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', 
                  cmap_bias = cmocean.cm.balance, cmap_field=cmocean.cm.thermal,
@@ -241,6 +256,14 @@ class CollectionOfExperiments:
                     target = lambda x: x.ssh_std_obs,
                     scale = 'm', cmap_label = 'STD SSH, m',
                     range_field=(0,0.3), range_bias=(-0.1,0.1))
+        
+    def plot_RV(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default'):
+        self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
+                    cmap_bias = cmocean.cm.balance, cmap_field=cmocean.cm.balance,
+                    field = lambda x: x.RV.isel(time=-1), 
+                    target = lambda x: None,
+                    scale = 'm', cmap_label = 'Relative vorticity 1/s',
+                    range_field=(-3e-5,3e-5), range_bias=(-3e-5,3e-5))
         
     def plot_temp_section(self, exps, labels=None, select=select_Drake, plot_type = 'default'):
         default_rcParams({'font.size': 10})

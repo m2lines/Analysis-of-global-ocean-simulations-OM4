@@ -87,7 +87,7 @@ def select_NA(array):
     return select_LatLon(array, Lat=(20, 60), Lon=(260-360,330-360))
 
 def select_NA_large(array):
-    return select_LatLon(array, Lat=(20, 70), Lon=(-80,20))
+    return select_LatLon(array, Lat=(20, 70), Lon=(-100,20))
 
 def select_Pacific(array):
     return select_LatLon(array, Lat=(10, 65), Lon=(-250+360,-130+360))
