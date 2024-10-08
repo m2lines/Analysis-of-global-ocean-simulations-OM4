@@ -172,10 +172,38 @@ class Experiment:
     @cached_property
     def ssh_std_obs(self):
         '''
-        Copernicus data
+        Copernicus data 1993-1995
         '''
         obs = sort_longitude(xr.open_dataset('../data/ssh_std_obs.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).adt.chunk({}))
         return obs
+    
+    @cached_property
+    def geoKE_Gulf_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoKE_Gulf.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoKE_Kuroshio_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoKE_Kuroshio.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoKE_Aghulas_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoKE_Aghulas.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoKE_Malvinas_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoKE_Malvinas.nc').__xarray_dataarray_variable__
     
     @netcdf_property
     def thetao(self):
@@ -252,3 +280,40 @@ class Experiment:
         dudy = grid.diff(u * dxCu,'Y')
 
         return (dvdx - dudy) * IareaBu
+    
+    def geoKE_spectrum(self, Lat=(25,45), Lon=(-60,-40)):
+        '''
+        We estimate KE spectrum from ssh, i.e.
+        it is spectrum of geostrophic motions.
+
+        Given the relation u = g/f nabla^perp ssh,
+        The KE spectrum is given by:
+        KE = g^2 / f^2 * k^2 * E,
+        where E is the power spectrum of SSH
+        '''
+        E = compute_isotropic_PE(self.ocean_daily.zos.chunk({'xh':-1}), self.param.dxt, self.param.dyt, 
+                                 Lat=Lat, Lon=Lon)
+        Omega = 7.2921e-5
+        g = 9.8
+        deg_to_rad = np.pi / 180 # degrees to radians factor
+        #  Coriolis parameter in the box averaged
+        f = 2 * Omega * np.sin(self.param.yh * deg_to_rad).sel(yh=slice(25,45)).mean()
+
+        KE = g**2 / f**2 * E.freq_r**2 * E
+        return KE
+    
+    @netcdf_property
+    def geoKE_Gulf(self):
+        return self.geoKE_spectrum(Lat=(25,45), Lon=(-60,-40)).sel(time=self.Averaging_time).mean('time').compute()
+    
+    @netcdf_property
+    def geoKE_Kuroshio(self):
+        return self.geoKE_spectrum(Lat=(25,45), Lon=(150,170)).sel(time=self.Averaging_time).mean('time').compute()
+    
+    @netcdf_property
+    def geoKE_Aghulas(self):
+        return self.geoKE_spectrum(Lat=(-50,-30), Lon=(40,60)).sel(time=self.Averaging_time).mean('time').compute()
+    
+    @netcdf_property
+    def geoKE_Malvinas(self):
+        return self.geoKE_spectrum(Lat=(-51,-31), Lon=(-49,-29)).sel(time=self.Averaging_time).mean('time').compute()

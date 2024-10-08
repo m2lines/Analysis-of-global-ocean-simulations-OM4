@@ -317,3 +317,43 @@ class CollectionOfExperiments:
             ax.invert_yaxis()
             plt.ylabel('Depth, m')
             plt.xlabel('Latitude')
+
+    def plot_KE_spectrum(self, exps, labels=None, colors=None):
+        default_rcParams({'font.size': 14})
+        if labels is None:
+            labels=exps
+        fig, ax = plt.subplots(2,2,figsize=(12,8))
+
+        if colors is None:
+                colors = [None] * len(exps)
+                colors[0] = 'tab:gray'
+                colors[-1] = 'k'
+            
+        lw = [2] * len(exps)
+        lw[-1] = 1.5
+
+        for j_exp,exp in enumerate(exps):
+            for j_region, region in enumerate(['Gulf', 'Kuroshio', 'Aghulas', 'Malvinas']):
+                plt.subplot(2,2,1+j_region)
+                if exp == 'obs':
+                    KE = self['unparameterized'].__getattribute__(f'geoKE_{region}_obs')
+                else:
+                    KE = self[exp].__getattribute__(f'geoKE_{region}')
+
+                KE.plot(label=labels[j_exp], color=colors[j_exp], xscale='log', yscale='log', lw=lw[j_exp])
+                plt.title(region)
+
+        for j_region in range(4):
+            plt.subplot(2,2,j_region+1)
+            plt.xlabel(r'wavenumber, $[\mathrm{km}^{-1}]$')
+            plt.ylabel(r'Geostrophic KE spectrum $[\mathrm{m}^3/\mathrm{s}^2]$')
+            plt.xlim([None,2e-4])
+            plt.ylim([1e-2,1e+4])
+            plt.xticks([1e-5, 1e-4], ['10$^{-2}$', '10$^{-1}$'])
+
+            k=np.array([2e-5,1e-4])
+            plt.plot(k,7e+3*(k/2e-5)**(-3), ls='--', color='k')
+            plt.text(6e-5,5e+2,'$k^{-3}$')
+
+        plt.legend(bbox_to_anchor=(1,1))
+        plt.tight_layout()
