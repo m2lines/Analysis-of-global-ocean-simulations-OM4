@@ -205,6 +205,62 @@ class Experiment:
         '''
         return xr.open_dataset('../data/geoKE_Malvinas.nc').__xarray_dataarray_variable__
     
+    @cached_property
+    def geoEKE_Gulf_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoEKE_Gulf.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoEKE_Kuroshio_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoEKE_Kuroshio.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoEKE_Aghulas_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoEKE_Aghulas.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoEKE_Malvinas_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoEKE_Malvinas.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoMKE_Gulf_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoMKE_Gulf.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoMKE_Kuroshio_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoMKE_Kuroshio.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoMKE_Aghulas_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoMKE_Aghulas.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoMKE_Malvinas_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoMKE_Malvinas.nc').__xarray_dataarray_variable__
+    
     @netcdf_property
     def thetao(self):
         out = self.ocean_month_z.thetao.sel(time=self.Averaging_time).mean('time')
@@ -281,7 +337,7 @@ class Experiment:
 
         return (dvdx - dudy) * IareaBu
     
-    def geoKE_spectrum(self, Lat=(25,45), Lon=(-60,-40)):
+    def geoKE_spectrum(self, zos, Lat=(25,45), Lon=(-60,-40)):
         '''
         We estimate KE spectrum from ssh, i.e.
         it is spectrum of geostrophic motions.
@@ -291,7 +347,7 @@ class Experiment:
         KE = g^2 / f^2 * k^2 * E,
         where E is the power spectrum of SSH
         '''
-        E = compute_isotropic_PE(self.ocean_daily.zos.chunk({'xh':-1}), self.param.dxt, self.param.dyt, 
+        E = compute_isotropic_PE(zos.chunk({'xh':-1}), self.param.dxt, self.param.dyt, 
                                  Lat=Lat, Lon=Lon)
         Omega = 7.2921e-5
         g = 9.8
@@ -304,16 +360,48 @@ class Experiment:
     
     @netcdf_property
     def geoKE_Gulf(self):
-        return self.geoKE_spectrum(Lat=(25,45), Lon=(-60,-40)).sel(time=self.Averaging_time).mean('time').compute()
+        return self.geoKE_spectrum(self.ocean_daily.zos, Lat=(25,45), Lon=(-60,-40)).sel(time=self.Averaging_time).mean('time').compute()
     
     @netcdf_property
     def geoKE_Kuroshio(self):
-        return self.geoKE_spectrum(Lat=(25,45), Lon=(150,170)).sel(time=self.Averaging_time).mean('time').compute()
+        return self.geoKE_spectrum(self.ocean_daily.zos, Lat=(25,45), Lon=(150,170)).sel(time=self.Averaging_time).mean('time').compute()
     
     @netcdf_property
     def geoKE_Aghulas(self):
-        return self.geoKE_spectrum(Lat=(-50,-30), Lon=(40,60)).sel(time=self.Averaging_time).mean('time').compute()
+        return self.geoKE_spectrum(self.ocean_daily.zos, Lat=(-50,-30), Lon=(40,60)).sel(time=self.Averaging_time).mean('time').compute()
     
     @netcdf_property
     def geoKE_Malvinas(self):
-        return self.geoKE_spectrum(Lat=(-51,-31), Lon=(-49,-29)).sel(time=self.Averaging_time).mean('time').compute()
+        return self.geoKE_spectrum(self.ocean_daily.zos, Lat=(-51,-31), Lon=(-49,-29)).sel(time=self.Averaging_time).mean('time').compute()
+    
+    @netcdf_property
+    def geoMKE_Gulf(self):
+        return self.geoKE_spectrum(self.ocean_daily.zos.sel(time=self.Averaging_time).mean('time'), Lat=(25,45), Lon=(-60,-40)).compute()
+    
+    @netcdf_property
+    def geoMKE_Kuroshio(self):
+        return self.geoKE_spectrum(self.ocean_daily.zos.sel(time=self.Averaging_time).mean('time'), Lat=(25,45), Lon=(150,170)).compute()
+    
+    @netcdf_property
+    def geoMKE_Aghulas(self):
+        return self.geoKE_spectrum(self.ocean_daily.zos.sel(time=self.Averaging_time).mean('time'), Lat=(-50,-30), Lon=(40,60)).compute()
+    
+    @netcdf_property
+    def geoMKE_Malvinas(self):
+        return self.geoKE_spectrum(self.ocean_daily.zos.sel(time=self.Averaging_time).mean('time'), Lat=(-51,-31), Lon=(-49,-29)).compute()
+    
+    @netcdf_property
+    def geoEKE_Gulf(self):
+        return self.geoKE_Gulf - self.geoMKE_Gulf
+    
+    @netcdf_property
+    def geoEKE_Kuroshio(self):
+        return self.geoKE_Kuroshio - self.geoMKE_Kuroshio
+    
+    @netcdf_property
+    def geoEKE_Aghulas(self):
+        return self.geoKE_Aghulas - self.geoMKE_Aghulas
+    
+    @netcdf_property
+    def geoEKE_Malvinas(self):
+        return self.geoKE_Malvinas - self.geoMKE_Malvinas

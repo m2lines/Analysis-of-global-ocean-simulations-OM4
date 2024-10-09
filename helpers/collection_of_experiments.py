@@ -318,7 +318,7 @@ class CollectionOfExperiments:
             plt.ylabel('Depth, m')
             plt.xlabel('Latitude')
 
-    def plot_KE_spectrum(self, exps, labels=None, colors=None):
+    def plot_KE_spectrum(self, exps, labels=None, colors=None, type='EKE'):
         default_rcParams({'font.size': 14})
         if labels is None:
             labels=exps
@@ -336,17 +336,17 @@ class CollectionOfExperiments:
             for j_region, region in enumerate(['Gulf', 'Kuroshio', 'Aghulas', 'Malvinas']):
                 plt.subplot(2,2,1+j_region)
                 if exp == 'obs':
-                    KE = self['unparameterized'].__getattribute__(f'geoKE_{region}_obs')
+                    KE = self['unparameterized'].__getattribute__(f'geo{type}_{region}_obs')
                 else:
-                    KE = self[exp].__getattribute__(f'geoKE_{region}')
+                    KE = self[exp].__getattribute__(f'geo{type}_{region}')
 
                 KE.plot(label=labels[j_exp], color=colors[j_exp], xscale='log', yscale='log', lw=lw[j_exp])
                 plt.title(region)
 
         for j_region in range(4):
             plt.subplot(2,2,j_region+1)
-            plt.xlabel(r'wavenumber, $[\mathrm{km}^{-1}]$')
-            plt.ylabel(r'Geostrophic KE spectrum $[\mathrm{m}^3/\mathrm{s}^2]$')
+            plt.xlabel(r'wavenumber $[\mathrm{km}^{-1}]$')
+            plt.ylabel(r'Geostrophic %s spectrum $[\mathrm{m}^3/\mathrm{s}^2]$' % type)
             plt.xlim([None,2e-4])
             plt.ylim([1e-2,1e+4])
             plt.xticks([1e-5, 1e-4], ['10$^{-2}$', '10$^{-1}$'])
