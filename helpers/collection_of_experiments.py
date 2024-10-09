@@ -56,24 +56,11 @@ class CollectionOfExperiments:
 
         return CollectionOfExperiments(exps, experiments_dict, names_dict)
     
-    def remesh(self, input, target, exp=None, name=None, compute=False, operator=remesh, FGR=None):
-        '''
-        input  - key of experiment to coarsegrain
-        target - key of experiment we want to take coordinates from
-        '''
-
-        if exp is None:
-            exp = input+'_'+target
-        if name is None:
-            name = input+' coarsegrained to '+target
-
-        result = self[input].remesh(self[target], exp, compute, operator, FGR) # call experiment method
-
-        print('Experiment '+input+' coarsegrained to '+target+
-            ' is created. Its identificator='+exp)
-        self.exps.append(exp)
-        self.experiments[exp] = result
-        self.names[exp] = name
+    def compute_statistics(self):
+        for exp in self.exps:
+            for key in Experiment.get_list_of_netcdf_properties():
+                self[exp].__getattribute__(key)
+                print('Computed: ', exp, key, ' '*100,end='\r')
 
     @classmethod
     def init_folder(cls, common_folder, exps=None, exps_names=None, additional_subfolder='output', prefix=None):

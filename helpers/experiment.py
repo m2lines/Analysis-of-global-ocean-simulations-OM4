@@ -36,62 +36,22 @@ class Experiment:
         if not os.path.exists(os.path.join(self.folder, 'ocean_geometry.nc')):
             print('Error, cannot find files in folder'+self.folder)
 
-    def remesh(self, target, key, compute=False, operator=remesh, FGR=None):
+    @classmethod
+    def get_list_of_netcdf_properties(cls):
         '''
-        Returns object "experiment", where "Main variables"
-        are coarsegrained according to resolution of the target experiment
-        operator - filtering/coarsegraining operator 
+        Allows to know what properties should be cached
+        https://stackoverflow.com/questions/27503965/list-property-decorated-methods-in-a-python-class
         '''
-
-        # The coarsegrained experiment is no longer attached to the folder
-        result = Experiment(folder=self.folder, key=key)
-        result.operator = operator
-        result.FGR = FGR
-
-        # Coarsegrain "Main variables" explicitly
-        for key in Experiment.get_list_of_main_properties():
-            if key in ['u', 'ua']:
-                mask = 'wet_u'
-            elif key in ['v', 'va']:
-                mask = 'wet_v'
-            elif key in ['e', 'h', 'ea', 'ha']:
-                mask = 'wet'
-            else:
-                mask = 'wet_c'
-
-            input_field = self.__getattribute__(key)
-            output_mask = target.param_extended[mask]
-
-            if operator == gaussian_remesh:
-                kw = {'FGR': FGR, 'input_mask': self.param_extended[mask]}
-            else:
-                kw = {}
-
-            if compute:
-                setattr(result, key, operator(input_field,output_mask,**kw).compute())
-            else:
-                setattr(result, key, operator(input_field,output_mask,**kw))
-
-        result.param = target.param # copy coordinates from target experiment
-        result._hires = self # store reference to the original experiment
-
+        result = []
+        for name, value in vars(cls).items():
+            if isinstance(value, netcdf_property):
+                result.append(name)
         return result
 
     @property
     def Averaging_time(self):
         return slice('1979','1981')
 
-    @classmethod
-    def get_list_of_main_properties(cls):
-        '''
-        Allows to know what properties should be coarsegrained
-        '''
-        result = []
-        for name, value in vars(cls).items():
-            if isinstance(value, main_property):
-                result.append(name)
-        return result
-    
     ################### Getters for netcdf files as xarrays #####################
     @cached_property
     def series(self):
@@ -122,11 +82,6 @@ class Experiment:
         rename_coordinates(result)
         return result
 
-    ######################## Auxiliary variables #########################
-    @main_property
-    def ssh(self):
-        return self.ocean_faily.zos
-
     ####################### Grid variables ###########################
     @cached_property
     def param_extended(self):
@@ -142,10 +97,6 @@ class Experiment:
     ########################  Statistical tools  #########################
 
     #-------------------  Mean flow and variability  --------------------#
-    # @netcdf_property
-    # def ssh_mean(self):
-    #     return self.ssf.sel(Time=self.Averaging_time).mean(dim='Time')
-
     @cached_property
     def woa_temp(self):
         '''
@@ -353,7 +304,7 @@ class Experiment:
         g = 9.8
         deg_to_rad = np.pi / 180 # degrees to radians factor
         #  Coriolis parameter in the box averaged
-        f = 2 * Omega * np.sin(self.param.yh * deg_to_rad).sel(yh=slice(25,45)).mean()
+        f = 2 * Omega * np.sin(self.param.yh * deg_to_rad).sel(yh=slice(Lat[0],Lat[1])).mean()
 
         KE = g**2 / f**2 * E.freq_r**2 * E
         return KE
