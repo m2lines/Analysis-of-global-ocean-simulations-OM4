@@ -348,9 +348,9 @@ class CollectionOfExperiments:
         plt.legend(bbox_to_anchor=(1,1))
         plt.tight_layout()
 
-    def plot_KE_lat(self, exps, labels=None, colors=None, type='EKE'):
+    def plot_lat(self, exps, labels=None, colors=None, type='EKE'):
         default_rcParams({'font.size': 14})
-        plt.figure(figsize=(10,4))
+        plt.figure(figsize=(10,8))
         if labels is None:
             labels=exps
 
@@ -363,17 +363,42 @@ class CollectionOfExperiments:
         lw[-1] = 1.5
 
         for j_exp,exp in enumerate(exps):
+            plt.subplot(2,1,1)
             if exp == 'obs':
                 KE = self['unparameterized'].__getattribute__(f'geo{type}_map_obs')
             else:
                 KE = self[exp].__getattribute__(f'geo{type}_map')
 
             KE = (KE).mean('xh')
-
             KE.plot(label=labels[j_exp], color=colors[j_exp], lw=lw[j_exp])
-            
+
+            plt.subplot(2,1,2)
+            if exp == 'obs':
+                scale = self['unparameterized'].__getattribute__('eddy_scale_obs')
+            else:
+                scale = self[exp].__getattribute__('eddy_scale')
+
+            scale = scale.mean('xh')
+            scale.plot(label=labels[j_exp], color=colors[j_exp], lw=lw[j_exp])
+
+        plt.subplot(2,1,1)
         plt.xlabel('Latitude')
         plt.xlim([-60,60])
         plt.ylim([0,0.05])
         plt.ylabel('Zonally-averaged \ngeostrophic %s [$\mathrm{m}^2/\mathrm{s}^2$]' % type)
+        plt.grid()
+        
+        plt.subplot(2,1,2)
+        dxt = self['unparameterized'].param.dxt
+        dyt = self['unparameterized'].param.dyt
+        dx = np.sqrt(dxt*dyt) / 1000. # in km
+        dx.mean('xh').plot(lw=1.5, color='tab:gray', ls='--', label='Grid spacing OM4')
+        self['unparameterized'].rossby_radius_lat.plot(lw=1.5, color='k', ls='-.', label='Rossby radius')
+        plt.title('')
+        plt.xlabel('Latitude')
+        plt.xlim([-60,60])
+        plt.ylim([0,400])
+        plt.yticks([0,50,100,150,200,250,300,350,400])
+        plt.grid()
+        plt.ylabel('Energy-containing scale [km]')    
         plt.legend()

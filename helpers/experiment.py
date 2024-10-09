@@ -233,6 +233,23 @@ class Experiment:
         '''
         return xr.open_dataset('../data/geoMKE_map.nc').__xarray_dataarray_variable__
     
+    @cached_property
+    def eddy_scale_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/eddy_scale.nc').__xarray_dataarray_variable__
+    
+    @property
+    def rossby_radius_lat(self):
+        '''
+        CM2.6 data
+        '''
+        radius = xr.open_dataset('/scratch/pp2681/mom6/CM26_datasets/ocean3d/subfilter/FGR3/factor-4/train-0.nc').deformation_radius / 1000. # in km
+        wet = xr.open_dataset('/scratch/pp2681/mom6/CM26_datasets/ocean3d/subfilter/FGR3/factor-4/param.nc').wet
+
+        return radius.sum('xh') / wet.isel(zl=0).sum('xh')
+    
     @netcdf_property
     def thetao(self):
         out = self.ocean_month_z.thetao.sel(time=self.Averaging_time).mean('time')
@@ -255,7 +272,29 @@ class Experiment:
     def ssh_std(self):
         ssh = self.ocean_daily.zos.sel(time=self.Averaging_time)
         return remesh(ssh.std('time'), self.woa_temp)
-    
+
+    @netcdf_property
+    def eddy_scale(self):
+        '''
+        According to Thompson and Young. Also see Yankovsky2022
+        '''
+        zos = self.ocean_daily.zos.sel(time=self.Averaging_time)
+        # Averaging operator is time mean
+        mean = lambda x: x.mean(['time'])
+
+        zos_anomaly = zos - mean(zos)
+
+        zos_anomaly_square = mean((zos_anomaly)**2)
+
+        grid = create_grid_global(self.param)
+        zos_anomaly_x = grid.interp(grid.diff(zos_anomaly, 'X') / self.param.dxCu,'X')
+        zos_anomaly_y = grid.interp(grid.diff(zos_anomaly, 'Y') / self.param.dyCv,'Y')
+
+        zos_grad_anomaly_square = mean( (zos_anomaly_x)**2 + (zos_anomaly_y)**2 )
+
+        # in km
+        return (np.sqrt(zos_anomaly_square / zos_grad_anomaly_square) / 1000.)
+
     @cached_property
     def geoU(self):
         '''
