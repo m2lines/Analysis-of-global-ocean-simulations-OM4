@@ -212,6 +212,27 @@ class Experiment:
         '''
         return xr.open_dataset('../data/geoMKE_Malvinas.nc').__xarray_dataarray_variable__
     
+    @cached_property
+    def geoKE_map_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoKE_map.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoEKE_map_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoEKE_map.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoMKE_map_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoMKE_map.nc').__xarray_dataarray_variable__
+    
     @netcdf_property
     def thetao(self):
         out = self.ocean_month_z.thetao.sel(time=self.Averaging_time).mean('time')
@@ -251,7 +272,9 @@ class Experiment:
         u = grid.interp(- g / fq * hy, 'Y')
         u = xr.where(np.abs(u.yh)<10, np.nan, u)
 
-        return u.chunk({'yh':-1,'xh':-1,'time':1})
+        u['time'] = self.ocean_daily.time.copy()
+
+        return u
 
     @cached_property
     def geoV(self):
@@ -269,7 +292,23 @@ class Experiment:
         v = grid.interp(+ g / fh * hx, 'X')
         v = xr.where(np.abs(v.yh)<10, np.nan, v)
 
-        return v.chunk({'yh':-1,'xh':-1,'time':1})
+        v['time'] = self.ocean_daily.time.copy()
+
+        return v
+    
+    @netcdf_property
+    def geoKE_map(self):
+        return ((self.geoU**2 + self.geoV**2) / 2).sel(time=self.Averaging_time).mean('time').compute()
+    
+    @netcdf_property
+    def geoMKE_map(self):
+        geoU = self.geoU.sel(time=self.Averaging_time).mean('time')
+        geoV = self.geoV.sel(time=self.Averaging_time).mean('time')
+        return ((geoU**2 + geoV**2) / 2).compute()
+    
+    @netcdf_property
+    def geoEKE_map(self):
+        return self.geoKE_map - self.geoMKE_map
 
     @cached_property
     def RV(self):

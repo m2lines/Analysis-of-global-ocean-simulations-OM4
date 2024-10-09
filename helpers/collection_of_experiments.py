@@ -59,8 +59,11 @@ class CollectionOfExperiments:
     def compute_statistics(self):
         for exp in self.exps:
             for key in Experiment.get_list_of_netcdf_properties():
-                self[exp].__getattribute__(key)
-                print('Computed: ', exp, key, ' '*100,end='\r')
+                try:
+                    self[exp].__getattribute__(key)
+                    print('Computed: ', exp, key, ' '*100,end='\r')
+                except:
+                    print('Error occured: ', exp, key, ' '*100,end='\r')
 
     @classmethod
     def init_folder(cls, common_folder, exps=None, exps_names=None, additional_subfolder='output', prefix=None):
@@ -312,9 +315,9 @@ class CollectionOfExperiments:
         fig, ax = plt.subplots(2,2,figsize=(12,8))
 
         if colors is None:
-                colors = [None] * len(exps)
-                colors[0] = 'tab:gray'
-                colors[-1] = 'k'
+            colors = [None] * len(exps)
+            colors[0] = 'tab:gray'
+            colors[-1] = 'k'
             
         lw = [2] * len(exps)
         lw[-1] = 1.5
@@ -344,3 +347,33 @@ class CollectionOfExperiments:
 
         plt.legend(bbox_to_anchor=(1,1))
         plt.tight_layout()
+
+    def plot_KE_lat(self, exps, labels=None, colors=None, type='EKE'):
+        default_rcParams({'font.size': 14})
+        plt.figure(figsize=(10,4))
+        if labels is None:
+            labels=exps
+
+        if colors is None:
+            colors = [None] * len(exps)
+            colors[0] = 'tab:gray'
+            colors[-1] = 'k'
+
+        lw = [3] * len(exps)
+        lw[-1] = 1.5
+
+        for j_exp,exp in enumerate(exps):
+            if exp == 'obs':
+                KE = self['unparameterized'].__getattribute__(f'geo{type}_map_obs')
+            else:
+                KE = self[exp].__getattribute__(f'geo{type}_map')
+
+            KE = (KE).mean('xh')
+
+            KE.plot(label=labels[j_exp], color=colors[j_exp], lw=lw[j_exp])
+            
+        plt.xlabel('Latitude')
+        plt.xlim([-60,60])
+        plt.ylim([0,0.05])
+        plt.ylabel('Zonally-averaged \ngeostrophic %s [$\mathrm{m}^2/\mathrm{s}^2$]' % type)
+        plt.legend()
