@@ -131,6 +131,7 @@ class CollectionOfExperiments:
             plt.xlabel('Years')
             plt.xticks(np.arange(6)*365,np.arange(6))
             plt.grid()
+            plt.ylim([3.75e+20, 3.95e+20])
             plt.ylabel('Available potential energy, Joules')
 
             if CFL:
@@ -160,22 +161,33 @@ class CollectionOfExperiments:
         
         fig = plt.figure(figsize=(4*ncol, 2*nrows), layout='constrained', dpi=200)
         
-        cmap_bias.set_bad('white', alpha=1)
-        cmap_field.set_bad('white', alpha=1)
+        # Some arrays were identified as all bad values but these are not
+        #cmap_bias.set_bad('white', alpha=1)
+        #cmap_field.set_bad('white', alpha=1)
+
+        data = select(field(self['unparameterized']))
+        central_latitude = float(y_coord(data).mean())
+        central_longitude = float(x_coord(data).mean())
 
         if projection == '3D':
-            projection = ccrs.Robinson()
+            if select == select_globe:
+                transform = ccrs.Robinson()
+            else:
+                transform = ccrs.Orthographic(central_latitude=central_latitude, central_longitude=central_longitude)
         elif projection == '2D':
-            projection = ccrs.PlateCarree()
+            transform = ccrs.PlateCarree()
         else:
             print('Specify projection as 2D or 3D')
         
         for ifig, exp in enumerate(exps):
-            ax = fig.add_subplot(nrows,ncol,ifig+1,projection=projection)
-            gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='-')
+            ax = fig.add_subplot(nrows,ncol,ifig+1,projection=transform)
+            if isinstance(transform, ccrs.Orthographic):
+                gl = ax.gridlines(draw_labels=True, linewidth=1,alpha=1, linestyle='-')
+            else:
+                gl = ax.gridlines(draw_labels=True, linewidth=0.01,alpha=0.0, linestyle='-')
             gl.top_labels = False
             gl.right_labels = False
-            if isinstance(projection, ccrs.PlateCarree):
+            if isinstance(transform, ccrs.PlateCarree) or isinstance(transform, ccrs.Orthographic):
                 ax.coastlines(zorder=101)
             
             label = labels[ifig]
@@ -214,6 +226,15 @@ class CollectionOfExperiments:
                                     cbar_kwargs={'label':cmap_label})
             ax.set_title(label)
             ax.add_feature(cfeature.LAND, color='gray', zorder=100)
+            if projection=='2D':
+                try:
+                    ax.set_xlim(data.xh[0], data.xh[-1])
+                except:
+                    ax.set_xlim(data.xq[0], data.xq[-1])
+                try:
+                    ax.set_ylim(data.yh[0], data.yh[-1])
+                except:
+                    ax.set_ylim(data.yq[0], data.yq[-1])
 
     def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default'):
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
@@ -247,13 +268,21 @@ class CollectionOfExperiments:
                     scale = 'm', cmap_label = 'STD SSH, m',
                     range_field=(0,0.3), range_bias=(-0.1,0.1))
         
-    def plot_RV(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default'):
+    def plot_geoRV(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', idx=-1):
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
                     cmap_bias = cmocean.cm.balance, cmap_field=cmocean.cm.balance,
-                    field = lambda x: x.RV.isel(time=-1), 
+                    field = lambda x: x.geoRV.isel(time=idx), 
                     target = lambda x: None,
-                    scale = 'm', cmap_label = 'Relative vorticity 1/s',
+                    scale = '1/s', cmap_label = 'Geostrophic relative vorticity 1/s',
                     range_field=(-3e-5,3e-5), range_bias=(-3e-5,3e-5))
+        
+    def plot_geovel(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', idx=-1):
+        self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
+                    cmap_bias = plt.cm.inferno, cmap_field=plt.cm.inferno,
+                    field = lambda x: np.log10(x.geovel.isel(time=idx)), 
+                    target = lambda x: None,
+                    scale = 'm', cmap_label = 'Geovelocity, log10',
+                    range_field=(-1.30,0.176), range_bias=(-1.30,0.176))
         
     def plot_temp_section(self, exps, labels=None, select=select_Drake, plot_type = 'default'):
         default_rcParams({'font.size': 10})
@@ -401,4 +430,4 @@ class CollectionOfExperiments:
         plt.yticks([0,50,100,150,200,250,300,350,400])
         plt.grid()
         plt.ylabel('Energy-containing scale [km]')    
-        plt.legend()
+        plt.legend(bbox_to_anchor=(1.2,1))

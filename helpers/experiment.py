@@ -112,13 +112,13 @@ class Experiment:
     def MLD_summer_obs(self):
         obs = np.load('../data/mod_r6_cycle1_MLE1_zgrid_MLD_003_min.npy', allow_pickle='TRUE').item()
         obs = sort_longitude(xr.DataArray(obs['obs'], dims=['xh', 'yh'], coords={'xh':obs['lon'], 'yh':obs['lat']})).T
-        return remesh(obs, self.woa_temp)
+        return obs
     
     @cached_property
     def MLD_winter_obs(self):
         obs = np.load('../data/mod_r6_cycle1_MLE1_zgrid_MLD_003_max.npy', allow_pickle='TRUE').item()
         obs = sort_longitude(xr.DataArray(obs['obs'], dims=['xh', 'yh'], coords={'xh':obs['lon'], 'yh':obs['lat']})).T
-        return remesh(obs, self.woa_temp)
+        return obs
     
     @cached_property
     def ssh_std_obs(self):
@@ -245,8 +245,8 @@ class Experiment:
         '''
         CM2.6 data
         '''
-        radius = xr.open_dataset('/scratch/pp2681/mom6/CM26_datasets/ocean3d/subfilter/FGR3/factor-4/train-0.nc').deformation_radius / 1000. # in km
-        wet = xr.open_dataset('/scratch/pp2681/mom6/CM26_datasets/ocean3d/subfilter/FGR3/factor-4/param.nc').wet
+        radius = xr.open_dataset('/vast/pp2681/CM26_datasets/ocean3d/subfilter/FGR3/factor-4/train-0.nc').deformation_radius / 1000. # in km
+        wet = xr.open_dataset('/vast/pp2681/CM26_datasets/ocean3d/subfilter/FGR3/factor-4/param.nc').wet
 
         return radius.sum('xh') / wet.isel(zl=0).sum('xh')
     
@@ -258,13 +258,13 @@ class Experiment:
     
     @netcdf_property
     def MLD_summer(self):
-        MLD_003 = remesh(self.ocean_month.MLD_003, self.woa_temp).sel(time=self.Averaging_time)
+        MLD_003 = remesh(self.ocean_month.MLD_003, self.MLD_summer_obs).sel(time=self.Averaging_time)
         MLD_003_month = MLD_003.groupby('time.month').mean('time')
         return MLD_003_month.min('month')
     
     @netcdf_property
     def MLD_winter(self):
-        MLD_003 = remesh(self.ocean_month.MLD_003, self.woa_temp).sel(time=self.Averaging_time)
+        MLD_003 = remesh(self.ocean_month.MLD_003, self.MLD_winter_obs).sel(time=self.Averaging_time)
         MLD_003_month = MLD_003.groupby('time.month').mean('time')
         return MLD_003_month.max('month')
     
@@ -335,6 +335,37 @@ class Experiment:
 
         return v
     
+    @netcdf_property
+    def geovel(self):
+        '''
+        Modulus of geostrophic velocity over the last year
+        '''
+        return np.sqrt(self.geoU**2 + self.geoV**2).sel(time='1981')
+    
+    @netcdf_property
+    def geoRV(self):
+        '''
+        Relative vorticity of geostrophic velocity
+        '''
+        param = self.param
+        grid = create_grid_global(param)
+
+        dyCv = param.dyCv
+        dxCu = param.dxCu
+        IareaBu = 1. / param.areacello_bu
+
+        u = grid.interp(self.geoU, 'X')
+        v = grid.interp(self.geoV, 'Y')
+
+        dvdx = grid.diff(v * dyCv,'X')
+        dudy = grid.diff(u * dxCu,'Y')
+
+        RV = (dvdx - dudy) * IareaBu
+
+        RV['time'] = self.ocean_daily.time.copy()
+
+        return RV.sel(time='1981')
+
     @netcdf_property
     def geoKE_map(self):
         return ((self.geoU**2 + self.geoV**2) / 2).sel(time=self.Averaging_time).mean('time').compute()
