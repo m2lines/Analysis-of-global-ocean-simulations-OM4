@@ -1,3 +1,6 @@
 *.ipynb_checkpoints*
 *__pycache__*
 *.pdf
+*.mp4
+*.png
+*.out
