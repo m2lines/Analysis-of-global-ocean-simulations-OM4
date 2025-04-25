@@ -40,10 +40,7 @@ class netcdf_property:
         # Try to open netcdf if exists
         if os.path.exists(filename):
             #print(f'Reading file {filename}')
-            try:
-                ncfile = xr.open_dataset(filename, decode_times=False, chunks={'time': 1, 'zl': 1})
-            except:
-                ncfile = xr.open_dataset(filename, decode_times=False) # for very small files
+            ncfile = xr.open_dataset(filename, chunks={'time': 1, 'zl': 1})
             #print(f'Returning cached value of {funcname}')
             if funcname in ncfile:
                 value = ncfile[funcname]

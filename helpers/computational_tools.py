@@ -38,10 +38,13 @@ def y_coord(array):
         if name in array.dims:
             return array[name]
 
-def sort_longitude(x, lon_min=-180.):
+def sort_longitude(_x, lon_min=-180.):
     if lon_min is None:
-        return x
+        return _x
     lon_max=lon_min + 360.
+
+    x = _x.copy()
+
     for lon in x_coord_iterator(x):
         if lon.min() < lon_min:
             lon = xr.where(lon<lon_min, lon+360, lon)
@@ -84,13 +87,31 @@ def select_LatLon(array, Lat=(35,45), Lon=(5,15)):
                       y.name: slice(Lat[0],Lat[1])})
 
 def select_NA(array):
-    return select_LatLon(array, Lat=(20, 60), Lon=(260-360,330-360))
+    return select_LatLon(sort_longitude(array, lon_min=-180.), Lat=(20, 60), Lon=(260-360,330-360))
+
+def select_NA_small(array):
+    return select_LatLon(sort_longitude(array, lon_min=-180.), Lat=(30, 50), Lon=(-80,-40))
 
 def select_NA_large(array):
     return select_LatLon(array, Lat=(20, 70), Lon=(-90,0))
 
+def select_NA_Florida(array):
+    return select_LatLon(array, Lat=(25, 40), Lon=(-85,-50))
+
+def select_Double_Gyre(array):
+    return select_LatLon(array, Lat=(15, 70), Lon=(-100,0))
+
+def select_NA_Jenny(array):
+    return select_LatLon(array, Lat=(20, 90), Lon=(-80,20))
+
+def select_NA_Marzocchi(array):
+    return select_LatLon(array, Lat=(25, 75), Lon=(-90,10))
+
+def select_subpolar(array):
+    return select_LatLon(array, Lat=(50, 80), Lon=(-60,-20))
+
 def select_Pacific(array):
-    return select_LatLon(sort_longitude(array, lon_min=0), Lat=(10, 65), Lon=(-250+360,-130+360))
+    return select_LatLon(sort_longitude(array, lon_min=0), Lat=(10, 65), Lon=(-250+360,-100+360))
 
 def select_Cem(array):
     return select_LatLon(array, Lat=(-10,15), Lon=(-260+360,-230+360))
@@ -110,7 +131,13 @@ def select_Kuroshio(array):
     return select_LatLon(array, Lat=(20, 50), Lon=(120,180))
 
 def select_SO(array):
-    return select_LatLon(array, Lat=(-70,-30), Lon=(0,360))
+    return select_LatLon(array, Lat=(-70,-30), Lon=(-180,180))
+
+def select_SO_left(array):
+    return select_LatLon(array, Lat=(-80,-20), Lon=(-180,0))
+
+def select_SO_right(array):
+    return select_LatLon(array, Lat=(-80,-20), Lon=(0,180))
 
 def select_Aghulas(array):
     return select_LatLon(array, Lat=(-60,-30), Lon=(0,60))
@@ -121,6 +148,12 @@ def select_Malvinas(array):
 # Sections
 def select_Drake(array):
     return select_LatLon(array, Lat=(-70,-55), Lon=(-70,-69)).squeeze()
+
+def select_SO_zonal(array):
+    return select_LatLon(array, Lat=(-70,-30), Lon=(None,None)).mean('xh')
+
+def select_zonal(array):
+    return array.mean('xh')
 
 def select_Atlantic_transect(array):
     return select_LatLon(array, Lat=(-80,90), Lon=(-30,-29)).squeeze()

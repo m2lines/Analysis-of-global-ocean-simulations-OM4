@@ -2,10 +2,16 @@ import xarray as xr
 import os
 import numpy as np
 import xrft
-from functools import cached_property
+from functools import cached_property, cache
 from helpers.computational_tools import *
 from helpers.netcdf_cache import netcdf_property
 import math
+import xesmf as xe
+from xoverturning.compfunc import select_basins
+from xoverturning import calcmoc
+import gsw
+import glob
+from cmip_basins import generate_basin_codes
 
 class main_property(cached_property):
     '''
@@ -19,7 +25,7 @@ class Experiment:
     returned as @property. Compared to xarray, allows
     additional computational tools and initialized instantly (within ms)
     '''
-    def __init__(self, folder, key=''):
+    def __init__(self, folder, key='', Averaging_time=slice('1979','1981')):
         '''
         Initializes with folder containing all netcdf files corresponding
         to a given experiment.
@@ -32,6 +38,7 @@ class Experiment:
         self.folder = folder
         self.key = key # for storage of statistics
         self.recompute = False # default value of recomputing of cached on disk properties
+        self.Averaging_time=Averaging_time
 
         if not os.path.exists(os.path.join(self.folder, 'ocean_geometry.nc')):
             print('Error, cannot find files in folder'+self.folder)
@@ -48,10 +55,6 @@ class Experiment:
                 result.append(name)
         return result
 
-    @property
-    def Averaging_time(self):
-        return slice('1979','1981')
-
     ################### Getters for netcdf files as xarrays #####################
     @cached_property
     def series(self):
@@ -66,19 +69,68 @@ class Experiment:
 
     @cached_property
     def ocean_daily(self):
-        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_daily*.nc'), parallel=True))
+        '''
+        This return the last year of simulation for fast checks of the simulation
+        '''
+        year = self.Averaging_time.stop
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, f'{year}*ocean_daily*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
+        rename_coordinates(result)
+        return result
+    
+    @cached_property
+    def ocean_daily_long(self):
+        '''
+        This returns as much data as we have in Averaging_time
+        '''
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, f'*ocean_daily*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
         rename_coordinates(result)
         return result
     
     @cached_property
     def ocean_month(self):
-        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_0*.nc'), parallel=True))
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_0*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
         rename_coordinates(result)
         return result
     
     @cached_property
     def ocean_month_z(self):
-        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True)).rename({'z_l': 'zl'})
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1})).rename({'z_l': 'zl', 'z_i': 'zi'})
+        rename_coordinates(result)
+        return result
+    
+    @cached_property
+    def ocean_annual_z(self):
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_annual_z*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1})).rename({'z_l': 'zl', 'z_i': 'zi'})
+        rename_coordinates(result)
+        return result
+    
+    @cached_property
+    def ocean_annual_rho2(self):
+        try:
+            result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, 'diagnostics/*ocean_annual_rho2*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
+        except:
+            result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_annual_rho2*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
+        rename_coordinates(result)
+        return result
+    
+    @cached_property
+    def budget(self):
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, 'diagnostics/*budget*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
+        rename_coordinates(result)
+        return result
+    
+    @cached_property
+    def ocean3d(self):
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, 'diagnostics/*ocean_3d*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
+        rename_coordinates(result)
+        return result
+    
+    @cached_property
+    def ice(self):
+        try:
+            result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, 'diagnostics/*ice_month*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
+        except:
+            result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ice_month*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
         rename_coordinates(result)
         return result
 
@@ -93,6 +145,43 @@ class Experiment:
         param['wet_c']=np.floor(grid.interp(param.wet,['X','Y']))
 
         return param
+    
+    @property
+    def dz(self):
+        '''
+        Data by Ray computed by differencing zi
+        '''
+        return xr.DataArray([  5. ,  10. ,  10. ,  15. ,  22.5,  25. ,  25. ,  25. ,  37.5,
+                              50. ,  50. ,  75. , 100. , 100. , 100. , 100. , 100. , 100. ,
+                             100. , 100. , 100. , 100. , 100. , 175. , 250. , 375. , 500. ,
+                             500. , 500. , 500. , 500. , 500. , 500. , 500. , 500. ], dims='zl')
+
+    @property
+    def zi(self):
+        '''
+        Data from ocean_annual_z
+        '''
+        data = [0.000e+00, 5.000e+00, 1.500e+01, 2.500e+01, 4.000e+01, 6.250e+01,
+                             8.750e+01, 1.125e+02, 1.375e+02, 1.750e+02, 2.250e+02, 2.750e+02,
+                             3.500e+02, 4.500e+02, 5.500e+02, 6.500e+02, 7.500e+02, 8.500e+02,
+                             9.500e+02, 1.050e+03, 1.150e+03, 1.250e+03, 1.350e+03, 1.450e+03,
+                             1.625e+03, 1.875e+03, 2.250e+03, 2.750e+03, 3.250e+03, 3.750e+03,
+                             4.250e+03, 4.750e+03, 5.250e+03, 5.750e+03, 6.250e+03, 6.750e+03]
+        return xr.DataArray(data, dims='zi', coords={'zi': data})
+
+    @property
+    def zl(self):
+        '''
+        Data from ocean_annual_z
+        '''
+        data = [2.5000e+00, 1.0000e+01, 2.0000e+01, 3.2500e+01, 5.1250e+01, 7.5000e+01,
+                             1.0000e+02, 1.2500e+02, 1.5625e+02, 2.0000e+02, 2.5000e+02, 3.1250e+02,
+                             4.0000e+02, 5.0000e+02, 6.0000e+02, 7.0000e+02, 8.0000e+02, 9.0000e+02,
+                             1.0000e+03, 1.1000e+03, 1.2000e+03, 1.3000e+03, 1.4000e+03, 1.5375e+03,
+                             1.7500e+03, 2.0625e+03, 2.5000e+03, 3.0000e+03, 3.5000e+03, 4.0000e+03,
+                             4.5000e+03, 5.0000e+03, 5.5000e+03, 6.0000e+03, 6.5000e+03]
+        
+        return xr.DataArray(data, dims='zl', coords={'zl': data})
 
     ########################  Statistical tools  #########################
 
@@ -104,9 +193,28 @@ class Experiment:
         and vertical grid of MOM6 output
         '''
         woa = sort_longitude(xr.open_dataset('../data/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({}))
-        woa_interp = woa.interp(depth=self.ocean_month_z.zl)
+        woa_interp = woa.interp(depth=self.zl)
         woa_interp[{'zl':0}] = woa[{'depth':0}]
-        return woa_interp.squeeze().drop_vars(['time', 'depth'])
+        return woa_interp.squeeze().drop_vars(['time', 'depth']).compute()
+    
+    @cached_property
+    def woa_salt(self):
+        '''
+        WOA salinity data on its native horizontal 1x1 grid
+        and vertical grid of MOM6 output
+        '''
+        woa = sort_longitude(xr.open_dataset('../data/woa18_decav81B0_s00_01.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).s_an.chunk({}))
+        woa_interp = woa.interp(depth=self.zl)
+        woa_interp[{'zl':0}] = woa[{'depth':0}]
+        return woa_interp.squeeze().drop_vars(['time', 'depth']).compute()
+    
+    @cached_property
+    def woa_sigma0(self):
+        return gsw.sigma0(self.woa_salt, self.woa_temp).compute()
+    
+    @cached_property
+    def woa_sigma2(self):
+        return gsw.sigma2(self.woa_salt, self.woa_temp).compute()
     
     @cached_property
     def MLD_summer_obs(self):
@@ -127,6 +235,31 @@ class Experiment:
         '''
         obs = sort_longitude(xr.open_dataset('../data/ssh_std_obs.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).adt.chunk({}))
         return obs
+    
+    @cached_property
+    def ssh_mean_obs(self):
+        '''
+        Copernicus data 1993-2012
+        '''
+        obs = sort_longitude(xr.open_dataset('../data/ssh_mean.nc', decode_times=False).adt.chunk({}))
+        return obs
+    
+    @cached_property
+    def ssh_mean_glorys(self):
+        '''
+        GLORYS12V1 Reanalysis
+        1993-2016
+        '''
+        obs = xr.open_dataset('../data/ssh_mean_glorys.nc', decode_times=False).zos.chunk({})
+        return obs
+    
+    @cached_property
+    def ssh_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return sort_longitude(xr.open_dataset('/scratch/pp2681/altimetry_Copernicus.nc', chunks={'time':1}).rename(
+            {'longitude': 'xh', 'latitude': 'yh'}).adt.sel(time=slice('1993','1995')))
     
     @cached_property
     def geoKE_Gulf_obs(self):
@@ -250,29 +383,463 @@ class Experiment:
 
         return radius.sum('xh') / wet.isel(zl=0).sum('xh')
     
+    @cached_property
+    def geovel_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geovel.nc', chunks={'time':1}).__xarray_dataarray_variable__
+    
+    @cached_property
+    def geoRV_obs(self):
+        '''
+        Copernicus data 1993-1995
+        '''
+        return xr.open_dataset('../data/geoRV.nc').__xarray_dataarray_variable__
+    
+    @cached_property
+    def BT_fraction_obs(self):
+        '''
+        CM2.6 monthly data coarsened to 0.3^o grid
+        Averaged over the last year
+        '''
+        return self.regrid(sort_longitude(xr.open_dataset('../data/BT_fraction_30days_coarsen.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'})), self.BT_fraction)
+    
+    @cached_property
+    def KE_obs(self):
+        '''
+        CM2.6 monthly data coarsened to 0.3^o grid
+        Averaged over the last year
+        Depth-averaged kinetic energy
+        '''
+        return sort_longitude(xr.open_dataset('../data/KE.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'}))
+    
+    @cached_property
+    def KE_BT_obs(self):
+        '''
+        CM2.6 monthly data coarsened to 0.3^o grid
+        Averaged over the last year
+        Barotropic kinetic energy
+        '''
+        return sort_longitude(xr.open_dataset('../data/KE_BT.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'}))
+    
+    def regrid(self, input_data, target):
+        '''
+        Target should be on regular lon-lat grid
+        '''
+        xin = x_coord(input_data)
+        yin = y_coord(input_data)
+        xout = x_coord(target)
+        yout = y_coord(target)
+        if xin.name == 'xh' and yin.name == 'yh':
+            lon = self.param.geolon
+            lat = self.param.geolat
+        elif xin.name == 'xq' and yin.name == 'yh':
+            lon = self.param.geolon_u
+            lat = self.param.geolat_u
+        elif xin.name == 'xh' and yin.name == 'yq':
+            lon = self.param.geolon_v
+            lat = self.param.geolat_v
+        elif xin.name == 'xq' and yin.name == 'yq':
+            lon = self.param.geolon_c
+            lat = self.param.geolat_c
+        else:
+            print('Wrong combination of coordinates for interpolation')
+
+        coords = xr.Dataset()
+        coords['lon'] = lon
+        coords['lat'] = lat
+        target_rename = target.rename({xout.name: 'lon', yout.name: 'lat'})
+        regridder = xe.Regridder(coords, target.rename({xout.name: 'lon', yout.name: 'lat'}), "nearest_s2d", ignore_degenerate=True, periodic=True, unmapped_to_nan=True)
+
+        out = regridder(input_data.rename({xin.name:'lon', yin.name:'lat'})).rename({'lon':xout.name, 'lat': yout.name})
+        if 'time' in input_data.dims:
+            out = out.assign_coords({'time': input_data.time})
+        return out
+    
+    @cached_property
+    def depth(self):
+        depth = self.param.deptho
+        return self.regrid(depth, self.woa_temp) # regrid on regular mesh
+
     @netcdf_property
     def thetao(self):
-        out = self.ocean_month_z.thetao.sel(time=self.Averaging_time).mean('time')
-        out = remesh(out, self.woa_temp)
+        try:
+            input_data = self.ocean_annual_z.thetao
+        except:
+            input_data = self.ocean_month_z.thetao#.sel(time=self.Averaging_time).mean('time')
+
+        out = self.regrid(input_data, self.woa_temp)
         return xr.where(np.isnan(self.woa_temp), np.nan, out)
     
     @netcdf_property
+    def salto(self):
+        try:
+            input_data = self.ocean_annual_z.so
+        except:
+            input_data = self.ocean_month_z.so#.sel(time=self.Averaging_time).mean('time')
+
+        out = self.regrid(input_data, self.woa_temp)
+        return xr.where(np.isnan(self.woa_temp), np.nan, out)
+    
+    @netcdf_property
+    def sigma0(self):
+        return gsw.sigma0(self.salto, self.thetao)
+    
+    @netcdf_property
+    def sigma2(self):
+        return gsw.sigma2(self.salto, self.thetao)
+    
+    @netcdf_property
+    def N_buoyancy_frequency(self):
+        rho = self.sigma2 + 1000.
+        rho_zi = rho.interp(zl=self.zi).drop_vars('zi')
+        rho_zi[{'zi':0}] = rho[{'zl':0}]
+        drho_dz = (rho_zi.isel(zi=slice(0,-1)) - rho_zi.isel(zi=slice(1,None))).rename({'zi': 'zl'}) / self.dz
+        g = 9.8
+        N = np.sqrt(np.maximum(-g * drho_dz / rho,0))
+        N['zl'] = self.zl
+        return N
+    
+    @cached_property
+    def N_buoyancy_frequency_woa(self):
+        rho = self.woa_sigma2 + 1000.
+        rho_zi = rho.interp(zl=self.zi).drop_vars('zi')
+        rho_zi[{'zi':0}] = rho[{'zl':0}]
+        drho_dz = (rho_zi.isel(zi=slice(0,-1)) - rho_zi.isel(zi=slice(1,None))).rename({'zi': 'zl'}) / self.dz
+        g = 9.8
+        N = np.sqrt(np.maximum(-g * drho_dz / rho,0))
+        N['zl'] = self.zl
+        return N.compute()
+    
+    @netcdf_property
+    def ubar(self):
+        u = self.ocean_month_z.uo
+        dt = self.ocean_month_z.average_DT.astype('float64')
+        dz = self.dz
+
+        mask = xr.where(np.isnan(u.isel(time=-1)), 0., 1.).compute().chunk({})
+
+        # Depth-average; Nans are skipped by xarray, and so mask
+        u_z = (u * dz).sum('zl') / (mask * dz).sum('zl')
+
+        # Time-averaging
+        u_zt = (u_z * dt).sel(time=self.Averaging_time).sum('time') / (dt).sel(time=self.Averaging_time).sum('time')
+
+        # restore nans
+        u_zt = xr.where(self.param.wet_u==1., u_zt, np.nan)
+
+        return u_zt
+    
+    @netcdf_property
+    def KE(self):
+        grid = create_grid_global(self.param)
+
+        u = grid.interp(self.ocean_month_z.uo.sel(time=self.Averaging_time), 'X')
+        v = grid.interp(self.ocean_month_z.vo.sel(time=self.Averaging_time), 'Y')
+        dz = self.dz
+        masku = xr.where(np.isnan(u.isel(time=-1)), np.nan, 1.)
+        maskv = xr.where(np.isnan(v.isel(time=-1)), np.nan, 1.)
+        mask = masku * maskv
+        mask_2d = mask.isel(zl=0)
+
+        def ave_z(x):
+            return (((mask * x * dz).sum('zl') / (mask * dz).sum('zl'))) * mask_2d
+        
+        KE = ave_z(0.5*(u**2 + v**2))
+
+        return sort_longitude(KE.mean('time'))
+    
+    @netcdf_property
+    def KE_BT(self):
+        grid = create_grid_global(self.param)
+
+        u = grid.interp(self.ocean_month_z.uo.sel(time=self.Averaging_time), 'X')
+        v = grid.interp(self.ocean_month_z.vo.sel(time=self.Averaging_time), 'Y')
+        dz = self.dz
+        masku = xr.where(np.isnan(u.isel(time=-1)), np.nan, 1.)
+        maskv = xr.where(np.isnan(v.isel(time=-1)), np.nan, 1.)
+        mask = masku * maskv
+        mask_2d = mask.isel(zl=0)
+
+        def ave_z(x):
+            return (((mask * x * dz).sum('zl') / (mask * dz).sum('zl'))) * mask_2d
+        
+        KE_BT = 0.5 * (ave_z(u)**2 + ave_z(v)**2)
+        
+        return sort_longitude(KE_BT.mean('time'))
+
+    @netcdf_property
+    def BT_fraction(self):
+        grid = create_grid_global(self.param)
+
+        u = grid.interp(self.ocean_month_z.uo.sel(time=self.Averaging_time), 'X')
+        v = grid.interp(self.ocean_month_z.vo.sel(time=self.Averaging_time), 'Y')
+        dz = self.dz
+        masku = xr.where(np.isnan(u.isel(time=-1)), np.nan, 1.)
+        maskv = xr.where(np.isnan(v.isel(time=-1)), np.nan, 1.)
+        mask = masku * maskv
+        mask_2d = mask.isel(zl=0)
+
+        def ave_z(x):
+            return (((mask * x * dz).sum('zl') / (mask * dz).sum('zl'))) * mask_2d
+        
+        KE = ave_z(0.5*(u**2 + v**2))
+        KE_BT = 0.5 * (ave_z(u)**2 + ave_z(v)**2)
+
+        BT_fraction = KE_BT / KE
+
+        return sort_longitude(BT_fraction.mean('time'))
+    
+    @netcdf_property
     def MLD_summer(self):
-        MLD_003 = remesh(self.ocean_month.MLD_003, self.MLD_summer_obs).sel(time=self.Averaging_time)
-        MLD_003_month = MLD_003.groupby('time.month').mean('time')
-        return MLD_003_month.min('month')
+        return self.regrid(self.ocean_month.MLD_003.sel(time=self.Averaging_time).groupby('time.month').mean('time').min('month'), 
+                            self.MLD_summer_obs)
     
     @netcdf_property
     def MLD_winter(self):
-        MLD_003 = remesh(self.ocean_month.MLD_003, self.MLD_winter_obs).sel(time=self.Averaging_time)
-        MLD_003_month = MLD_003.groupby('time.month').mean('time')
-        return MLD_003_month.max('month')
+        return self.regrid(self.ocean_month.MLD_003.sel(time=self.Averaging_time).groupby('time.month').mean('time').max('month'),
+                            self.MLD_winter_obs)
     
     @netcdf_property
     def ssh_std(self):
-        ssh = self.ocean_daily.zos.sel(time=self.Averaging_time)
-        return remesh(ssh.std('time'), self.woa_temp)
+        ssh = self.ocean_daily_long.zos.sel(time=self.Averaging_time)
+        return self.regrid(ssh.std('time'), self.woa_temp).chunk({'yh':10})
+    
+    @netcdf_property
+    def ssh_mean(self):
+        try:
+            ssh = self.ocean_month.zos.sel(time=self.Averaging_time)
+            return self.regrid(ssh.mean('time'), self.woa_temp)
+        except:
+            ssh = self.ocean_daily.zos.sel(time=self.Averaging_time)
+            return self.regrid(ssh.mean('time'), self.woa_temp)
+    
+    @netcdf_property
+    def u_mean(self):
+        try:
+            return self.ocean_annual_z.uo.sel(time=self.Averaging_time).mean('time')
+        except:
+            return self.ocean_month_z.uo.sel(time=self.Averaging_time).mean('time')
+    
+    @netcdf_property
+    def v_mean(self):
+        try:
+            return self.ocean_annual_z.vo.sel(time=self.Averaging_time).mean('time')
+        except:
+            return self.ocean_month_z.vo.sel(time=self.Averaging_time).mean('time')
+    
+    @netcdf_property
+    def uabs(self):
+        grid = create_grid_global(self.param)
+        velocity = np.sqrt(grid.interp(self.u_mean, 'X')**2 + grid.interp(self.v_mean, 'Y')**2)
+        return self.regrid(velocity, velocity)
+    
+    @netcdf_property
+    def barotropic_streamfunction(self):
+        '''
+        We use algorithm of CDFtools, and integrate zonal transport
+        from the South Pole in meridional direction through land
+        We set streamfunction to zero in America land (for convenience of plotting)
+        '''
+        umo = self.ocean_annual_z.umo.sel(time=self.Averaging_time).mean('time')
+        # 1e+9 is conversion of kg to m^3 (1e+3) and to Sverdrups (another 1e+6)
+        psi_global = - (umo.sum('zl').cumsum('yh')).compute() / 1e+9
+        # Streamfunction becomes to be deined in a corner after integration
+        psi_global = psi_global.rename({'yh': 'yq'})
+        psi_global['yq'] = self.param.yq
 
+        # Here we set streamfunction to be zero at the America land
+        #psi_global = psi_global - psi_global.sel(xq=-80,yq=40, method='nearest')
+        # This interpolation intends to regrid data on regular grid
+        return self.regrid(psi_global, psi_global)
+    
+    @property
+    def AMOC_mask(self):
+        '''
+        This is mask of Atlantic and Arctic oceans as they are defined in xoverturning
+        '''
+        param = self.param
+        param['zi'] = self.ocean_annual_z['zi']
+        param['zl'] = self.ocean_annual_z['zl']
+        names = dict(
+        x_center="xh",
+        y_center="yh",
+        x_corner="xq",
+        y_corner="yq",
+        lon_t="geolon",
+        lat_t="geolat",
+        mask_t="wet",
+        lon_v="geolon_v",
+        lat_v="geolat_v",
+        mask_v="wet_v",
+        bathy="deptho",
+        interface="zi",
+        layer="zl"
+        )
+        out = select_basins(param[['geolon_v', 'geolat_v', 'wet_v']], names, basin="atl-arc", lon="geolon_v", lat="geolat_v", mask="wet_v", vertical="zl", verbose=True)
+        return xr.where(out[0], 1., 0.)
+    
+    @property
+    def AMOC_mask_center(self):
+        '''
+        This is mask of Atlantic and Arctic oceans as they are defined in xoverturning
+        '''
+        param = self.param
+        param['zi'] = self.ocean_annual_z['zi']
+        param['zl'] = self.ocean_annual_z['zl']
+        names = dict(
+        x_center="xh",
+        y_center="yh",
+        x_corner="xq",
+        y_corner="yq",
+        lon_t="geolon",
+        lat_t="geolat",
+        mask_t="wet",
+        lon_v="geolon_v",
+        lat_v="geolat_v",
+        mask_v="wet_v",
+        bathy="deptho",
+        interface="zi",
+        layer="zl"
+        )
+        out = select_basins(param[['geolon', 'geolat', 'wet']], names, basin="atl-arc", lon="geolon", lat="geolat", mask="wet", vertical="zl", verbose=True)
+        return xr.where(out[0], 1., 0.)
+    
+    @property
+    def AMOC(self):
+        '''
+        Here we use xoverturning for brevity
+        '''
+        dsgrid = self.param
+        data = xr.Dataset()
+        try:
+            data['umo'] = self.ocean_annual_z.umo
+            data['z_i'] = self.zi.rename({'zi':'z_i'})
+        except:
+            data['umo'] = self.ocean_month_z.uo * 1e+3 * dsgrid.dxCu * self.dz
+            data['z_i'] = self.zi
+
+        try:
+            data['vmo'] = self.ocean_annual_z.vmo
+        except:
+            data['vmo'] = self.ocean_month_z.vo * 1e+3 * dsgrid.dyCv * self.dz
+        
+        data['umo'] = data['umo']#.sel(time=self.Averaging_time).mean('time') 
+        data['vmo'] = data['vmo']#.sel(time=self.Averaging_time).mean('time')
+        data = data.rename({'zl': 'z_l'})
+
+        amoc = calcmoc(data, dsgrid=dsgrid, basin='atl-arc')
+
+        return amoc.compute()
+    
+    @property
+    def AMOC_new(self):
+        '''
+        Here we compute AMOC ourselves
+        '''
+        basincodes = generate_basin_codes(self.param, lon='geolon_v', lat='geolat_v', mask='wet_v')
+        selected_codes = [2, 4, 6, 7, 8, 9]
+        mask = xr.where(basincodes.isin(selected_codes),1.,np.nan)
+
+        vmo = (self.ocean_annual_z.vmo * mask).sum('xh') / 1.035e9
+
+        amoc = -vmo.sel(zl=slice(None,None,-1)).cumsum('zl').isel(zl=slice(None,None,-1))
+        
+        # Above amoc array has vertical coordinate zl, but not zi. Here we extend it with B.C. at the bottom
+        amoc = amoc.pad({'zl':(0,1)}, constant_values=0)
+        # Change vertical coordinate
+        amoc = amoc.drop_vars('zl').rename({'zl':'zi'})
+        amoc['zi'] = self.zi
+
+        return amoc.compute()
+
+    @property
+    def AMOC_rho2(self):
+        dsgrid = self.param
+        data = xr.Dataset()
+
+        for key in ['umo', 'vmo']:
+            data[key] = self.ocean_annual_rho2[key]
+
+        for key in ['rho2_l', 'rho2_i']:
+            dsgrid[key] = self.ocean_annual_rho2[key]
+
+        return calcmoc(data, dsgrid=dsgrid, basin='atl-arc', vertical='rho2')
+    
+    @property
+    def MOC_rho2(self):
+        dsgrid = self.param
+        data = xr.Dataset()
+
+        for key in ['umo', 'vmo']:
+            data[key] = self.ocean_annual_rho2[key]
+
+        for key in ['rho2_l', 'rho2_i']:
+            dsgrid[key] = self.ocean_annual_rho2[key]
+
+        return calcmoc(data, dsgrid=dsgrid, basin='global', vertical='rho2')
+
+    @property
+    def MOC(self):
+        '''
+        Here we use xoverturning for brevity
+        '''
+        dsgrid = self.param
+        data = xr.Dataset()
+        try:
+            data['umo'] = self.ocean_annual_z.umo
+        except:
+            data['umo'] = self.ocean_month_z.uo * 1e+3 * dsgrid.dxCu * self.dz
+
+        try:
+            data['vmo'] = self.ocean_annual_z.vmo
+        except:
+            data['vmo'] = self.ocean_month_z.vo * 1e+3 * dsgrid.dyCv * self.dz
+        
+        data['umo'] = data['umo']#.sel(time=self.Averaging_time).mean('time') 
+        data['vmo'] = data['vmo']#.sel(time=self.Averaging_time).mean('time')
+        data = data.rename({'zl': 'z_l'})
+
+        data['zi'] = self.zi
+
+        moc = calcmoc(data, dsgrid=dsgrid, basin='global')
+
+        return moc.compute()
+    
+    @property
+    def AMOC_map(self):
+        '''
+        This function shows AMOC without integration in zonal direction.
+        Looking in this this function, we can understand, what currents contribute to
+        AMOC
+        '''
+        mask = self.AMOC_mask
+        vmo = self.ocean_annual_z.vmo.sel(time=self.Averaging_time).mean('time') * mask
+
+        # Here summation is remove for special
+        # To be able to see spatial map
+        zonal_integral = vmo#.sum('xh')
+
+        # Integration from the surface to the bottom
+        # with zero surface B.C.
+        # Result is in the interface points below surface
+        amoc = zonal_integral.cumsum('zl')
+
+        # Place explicitly zero B.C. on the surface
+        amoc = amoc.pad({'zl':(1,0)}, constant_values=0)
+
+        # Rename the coordinate to the interface
+        amoc = amoc.rename({'zl': 'zi'})
+        amoc['zi'] = self.zi
+
+        # Now we want to place zero B.C. on the bottom
+        # Add some non-zero B.C. on the surface
+        #amoc = amoc - amoc.isel(zi=-1)
+
+        # The conversion by 1e+9 is to convert kg to Sv
+        return amoc.compute() / 1e+9
+    
     @netcdf_property
     def eddy_scale(self):
         '''
@@ -309,7 +876,7 @@ class Experiment:
         hy = grid.diff(self.ocean_daily.zos, 'Y') / self.param.dyCv
         
         u = grid.interp(- g / fq * hy, 'Y')
-        u = xr.where(np.abs(u.yh)<10, np.nan, u)
+        #u = xr.where(np.abs(u.yh)<10, np.nan, u)
 
         u['time'] = self.ocean_daily.time.copy()
 
@@ -329,7 +896,7 @@ class Experiment:
         hx = grid.diff(self.ocean_daily.zos, 'X') / self.param.dxCu
         
         v = grid.interp(+ g / fh * hx, 'X')
-        v = xr.where(np.abs(v.yh)<10, np.nan, v)
+        #v = xr.where(np.abs(v.yh)<10, np.nan, v)
 
         v['time'] = self.ocean_daily.time.copy()
 
@@ -340,7 +907,7 @@ class Experiment:
         '''
         Modulus of geostrophic velocity over the last year
         '''
-        return np.sqrt(self.geoU**2 + self.geoV**2).sel(time='1981')
+        return np.sqrt(self.geoU**2 + self.geoV**2).isel(time=slice(None,None,3)).astype('float32')
     
     @netcdf_property
     def geoRV(self):
@@ -364,7 +931,7 @@ class Experiment:
 
         RV['time'] = self.ocean_daily.time.copy()
 
-        return RV.sel(time='1981')
+        return RV.isel(time=slice(None,None,3)).astype('float32')
 
     @netcdf_property
     def geoKE_map(self):
@@ -417,7 +984,7 @@ class Experiment:
 
         KE = g**2 / f**2 * E.freq_r**2 * E
         return KE
-    
+        
     @netcdf_property
     def geoKE_Gulf(self):
         return self.geoKE_spectrum(self.ocean_daily.zos, Lat=(25,45), Lon=(-60,-40)).sel(time=self.Averaging_time).mean('time').compute()

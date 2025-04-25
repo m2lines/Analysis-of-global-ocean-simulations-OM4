@@ -7,6 +7,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cmocean
 import imageio
 
+def cilev(dx=0.5, n=5):
+  array = dx*0.5 + np.arange(n) * dx
+  return np.hstack([-array[::-1], array])
+
 yellow = [0.9290, 0.6940, 0.1250]
 violet = [0.4940, 0.1840, 0.5560]
 lightblue = [0.3010, 0.7450, 0.9330]
@@ -48,7 +52,7 @@ def create_animation_ffmpeg(fun, idx, filename='my-video.mp4', dpi=200, FPS=18, 
         print(f'Resolution is set to {resolution[0]}x{resolution[1]}\n')
 
     print(f'Animation {filename} at FPS={FPS} will last for {round(len(idx)/FPS,1)} seconds. The frames are saved to \n{folder}\n')
-    ffmpeg_command = f'/home/ctrsp-2024/pp2681/ffmpeg-git-20240629-amd64-static/ffmpeg -y -framerate {FPS} -i {folder}/frame-%d.png -s:v {resolution[0]}x{resolution[1]} -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p {filename}'
+    ffmpeg_command = f'ffmpeg -y -framerate {FPS} -i {folder}/frame-%d.png -s:v {resolution[0]}x{resolution[1]} -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p {filename}'
     print('Running the command:')
     print(f'cd {os.getcwd()}; {ffmpeg_command}')
     try:
@@ -68,7 +72,7 @@ def default_rcParams(kw={}):
     '''
     plt.plot()
     plt.close()
-    rcParams = matplotlib.rcParamsDefault.copy()
+    rcParams = matplotlib.rcParamsDefault.copy(deep=True)
     
     # We do not change backend because it can break
     # inlining; Also, 'backend' key is broken and 
@@ -79,26 +83,26 @@ def default_rcParams(kw={}):
 
     matplotlib.rcParams.update({
         #'font.family': 'DejaVuSans_Condensed',
-        'mathtext.fontset': 'cm',
+        #'mathtext.fontset': 'cm',
 
-        'figure.figsize': (6, 6),
+        #'figure.figsize': (6, 6),
 
-        'figure.subplot.wspace': 0.3,
+        #'figure.subplot.wspace': 0.3,
         
-        'font.size': 14,
+        #'font.size': 14,
         #'axes.labelsize': 10,
         #'axes.titlesize': 12,
         #'xtick.labelsize': 10,
         #'ytick.labelsize': 10,
         #'legend.fontsize': 10,
 
-        'axes.formatter.limits': (-2,3),
-        'axes.formatter.use_mathtext': True,
-        'axes.labelpad': 0,
-        'axes.titlelocation' : 'center',
+        #'axes.formatter.limits': (-3,3),
+        #'axes.formatter.use_mathtext': True,
+        #'axes.labelpad': 0,
+        #'axes.titlelocation' : 'center',
         
-        'savefig.bbox': 'tight',
-        'savefig.pad_inches': 0.1
+       # 'savefig.bbox': 'tight',
+       # 'savefig.pad_inches': 0.1
     })
     matplotlib.rcParams.update(**kw)
 
