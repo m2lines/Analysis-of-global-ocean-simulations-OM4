@@ -7,6 +7,6 @@ This repository is a tool which can be used for **fast** analysis of multiple gl
 For full functionality, download WOA18 temperature and salinity to `data` folder:
 ```
 cd data
-wget https://www.ncei.noaa.gov/thredds-ocean/fileServer/ncei/woa/temperature/decav81B0/1.00/woa18_decav81B0_t00_01.nc woa_1981_2010.nc
+wget https://www.ncei.noaa.gov/thredds-ocean/fileServer/ncei/woa/temperature/decav81B0/1.00/woa18_decav81B0_t00_01.nc
 wget https://www.ncei.noaa.gov/thredds-ocean/fileServer/ncei/woa/temperature/decav81B0/1.00/woa18_decav81B0_s00_01.nc
 ```
