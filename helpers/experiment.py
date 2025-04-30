@@ -1,8 +1,10 @@
+import helpers.netcdf_cache
 import xarray as xr
 import os
 import numpy as np
 import xrft
 from functools import cached_property, cache
+import helpers
 from helpers.computational_tools import *
 from helpers.netcdf_cache import netcdf_property
 import math
@@ -39,6 +41,7 @@ class Experiment:
         self.key = key # for storage of statistics
         self.recompute = False # default value of recomputing of cached on disk properties
         self.Averaging_time=Averaging_time
+        self.data_folder = os.path.join(os.path.dirname(helpers.netcdf_cache.__file__), '../data')  # Where observational data is stored
 
         if not os.path.exists(os.path.join(self.folder, 'ocean_geometry.nc')):
             print('Error, cannot find files in folder'+self.folder)
@@ -63,7 +66,7 @@ class Experiment:
 
     @cached_property
     def param(self):
-        result = sort_longitude(xr.open_dataset('../data/ocean_static.nc')).drop_vars('time')
+        result = sort_longitude(xr.open_dataset(f'{self.data_folder}/ocean_static.nc')).drop_vars('time')
         rename_coordinates(result)
         return result
 
@@ -192,7 +195,7 @@ class Experiment:
         WOA temperature data on its native horizontal 1x1 grid
         and vertical grid of MOM6 output
         '''
-        woa = sort_longitude(xr.open_dataset('../data/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({}))
+        woa = sort_longitude(xr.open_dataset(f'{self.data_folder}/woa_1981_2010.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({}))
         woa_interp = woa.interp(depth=self.zl)
         woa_interp[{'zl':0}] = woa[{'depth':0}]
         return woa_interp.squeeze().drop_vars(['time', 'depth']).compute()
@@ -203,7 +206,7 @@ class Experiment:
         WOA salinity data on its native horizontal 1x1 grid
         and vertical grid of MOM6 output
         '''
-        woa = sort_longitude(xr.open_dataset('../data/woa18_decav81B0_s00_01.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).s_an.chunk({}))
+        woa = sort_longitude(xr.open_dataset(f'{self.data_folder}/woa18_decav81B0_s00_01.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).s_an.chunk({}))
         woa_interp = woa.interp(depth=self.zl)
         woa_interp[{'zl':0}] = woa[{'depth':0}]
         return woa_interp.squeeze().drop_vars(['time', 'depth']).compute()
@@ -218,13 +221,13 @@ class Experiment:
     
     @cached_property
     def MLD_summer_obs(self):
-        obs = np.load('../data/mod_r6_cycle1_MLE1_zgrid_MLD_003_min.npy', allow_pickle='TRUE').item()
+        obs = np.load(f'{self.data_folder}/mod_r6_cycle1_MLE1_zgrid_MLD_003_min.npy', allow_pickle='TRUE').item()
         obs = sort_longitude(xr.DataArray(obs['obs'], dims=['xh', 'yh'], coords={'xh':obs['lon'], 'yh':obs['lat']})).T
         return obs
     
     @cached_property
     def MLD_winter_obs(self):
-        obs = np.load('../data/mod_r6_cycle1_MLE1_zgrid_MLD_003_max.npy', allow_pickle='TRUE').item()
+        obs = np.load(f'{self.data_folder}/mod_r6_cycle1_MLE1_zgrid_MLD_003_max.npy', allow_pickle='TRUE').item()
         obs = sort_longitude(xr.DataArray(obs['obs'], dims=['xh', 'yh'], coords={'xh':obs['lon'], 'yh':obs['lat']})).T
         return obs
     
@@ -233,7 +236,7 @@ class Experiment:
         '''
         Copernicus data 1993-1995
         '''
-        obs = sort_longitude(xr.open_dataset('../data/ssh_std_obs.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).adt.chunk({}))
+        obs = sort_longitude(xr.open_dataset(f'{self.data_folder}/ssh_std_obs.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).adt.chunk({}))
         return obs
     
     @cached_property
@@ -241,7 +244,7 @@ class Experiment:
         '''
         Copernicus data 1993-2012
         '''
-        obs = sort_longitude(xr.open_dataset('../data/ssh_mean.nc', decode_times=False).adt.chunk({}))
+        obs = sort_longitude(xr.open_dataset(f'{self.data_folder}/ssh_mean.nc', decode_times=False).adt.chunk({}))
         return obs
     
     @cached_property
@@ -250,7 +253,7 @@ class Experiment:
         GLORYS12V1 Reanalysis
         1993-2016
         '''
-        obs = xr.open_dataset('../data/ssh_mean_glorys.nc', decode_times=False).zos.chunk({})
+        obs = xr.open_dataset(f'{self.data_folder}/ssh_mean_glorys.nc', decode_times=False).zos.chunk({})
         return obs
     
     @cached_property
@@ -266,112 +269,112 @@ class Experiment:
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoKE_Gulf.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoKE_Gulf.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoKE_Kuroshio_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoKE_Kuroshio.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoKE_Kuroshio.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoKE_Aghulas_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoKE_Aghulas.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoKE_Aghulas.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoKE_Malvinas_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoKE_Malvinas.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoKE_Malvinas.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoEKE_Gulf_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoEKE_Gulf.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoEKE_Gulf.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoEKE_Kuroshio_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoEKE_Kuroshio.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoEKE_Kuroshio.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoEKE_Aghulas_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoEKE_Aghulas.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoEKE_Aghulas.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoEKE_Malvinas_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoEKE_Malvinas.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoEKE_Malvinas.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoMKE_Gulf_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoMKE_Gulf.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoMKE_Gulf.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoMKE_Kuroshio_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoMKE_Kuroshio.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoMKE_Kuroshio.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoMKE_Aghulas_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoMKE_Aghulas.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoMKE_Aghulas.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoMKE_Malvinas_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoMKE_Malvinas.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoMKE_Malvinas.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoKE_map_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoKE_map.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoKE_map.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoEKE_map_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoEKE_map.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoEKE_map.nc').__xarray_dataarray_variable__
     
     @cached_property
     def geoMKE_map_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoMKE_map.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoMKE_map.nc').__xarray_dataarray_variable__
     
     @cached_property
     def eddy_scale_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/eddy_scale.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/eddy_scale.nc').__xarray_dataarray_variable__
     
     @property
     def rossby_radius_lat(self):
@@ -388,14 +391,14 @@ class Experiment:
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geovel.nc', chunks={'time':1}).__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geovel.nc', chunks={'time':1}).__xarray_dataarray_variable__
     
     @cached_property
     def geoRV_obs(self):
         '''
         Copernicus data 1993-1995
         '''
-        return xr.open_dataset('../data/geoRV.nc').__xarray_dataarray_variable__
+        return xr.open_dataset(f'{self.data_folder}/geoRV.nc').__xarray_dataarray_variable__
     
     @cached_property
     def BT_fraction_obs(self):
@@ -403,7 +406,7 @@ class Experiment:
         CM2.6 monthly data coarsened to 0.3^o grid
         Averaged over the last year
         '''
-        return self.regrid(sort_longitude(xr.open_dataset('../data/BT_fraction_30days_coarsen.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'})), self.BT_fraction)
+        return self.regrid(sort_longitude(xr.open_dataset(f'{self.data_folder}/BT_fraction_30days_coarsen.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'})), self.BT_fraction)
     
     @cached_property
     def KE_obs(self):
@@ -412,7 +415,7 @@ class Experiment:
         Averaged over the last year
         Depth-averaged kinetic energy
         '''
-        return sort_longitude(xr.open_dataset('../data/KE.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'}))
+        return sort_longitude(xr.open_dataset(f'{self.data_folder}/KE.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'}))
     
     @cached_property
     def KE_BT_obs(self):
@@ -421,7 +424,7 @@ class Experiment:
         Averaged over the last year
         Barotropic kinetic energy
         '''
-        return sort_longitude(xr.open_dataset('../data/KE_BT.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'}))
+        return sort_longitude(xr.open_dataset(f'{self.data_folder}/KE_BT.nc').__xarray_dataarray_variable__.rename({'xu_ocean':'xh', 'yu_ocean':'yh'}))
     
     def regrid(self, input_data, target):
         '''

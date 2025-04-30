@@ -72,7 +72,7 @@ def default_rcParams(kw={}):
     '''
     plt.plot()
     plt.close()
-    rcParams = matplotlib.rcParamsDefault.copy(deep=True)
+    rcParams = matplotlib.rcParamsDefault.copy()
     
     # We do not change backend because it can break
     # inlining; Also, 'backend' key is broken and 

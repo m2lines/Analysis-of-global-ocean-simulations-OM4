@@ -316,7 +316,7 @@ class CollectionOfExperiments:
 
             if isotherm_17:
                 therm_true = self['unparameterized'].woa_temp.isel(zl=8)
-                if exp is 'obs':
+                if exp == 'obs':
                     contours = select(therm_true).plot.contour(ax=ax, colors='b', transform=ccrs.PlateCarree(), linewidths=2, levels=[17])
                     plt.clabel(contours, inline=True, fontsize=6, fmt="%d$C^\circ$")
                 else:
