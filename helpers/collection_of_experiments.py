@@ -427,7 +427,7 @@ class CollectionOfExperiments:
                     range_field=(0,80), range_bias=(-20,20),
                     ncols=ncols, **kw)
         
-    def plot_MLD_winter(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', ncols=2, vmax=1000., **kw):
+    def plot_MLD_winter(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', ncols=2, vmax=100., **kw):
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
                     cmap_bias = plt.cm.RdYlBu, cmap_field=plt.cm.RdYlBu_r,
                     field = lambda x: x.MLD_winter, 
