@@ -227,12 +227,12 @@ class CollectionOfExperiments:
                 vmin, vmax = range_field[0:2]
                 cmap = cmap_field; norm=norm_field; cilev=cilev_field
 
-                try:
-                    error = data - target(self[exp])
-                    rmse = float(np.sqrt(np.nanmean(error**2)))
-                    label = label + ' bias' + f'\n RMSE=%.4f{scale}' % rmse
-                except:
-                    pass
+                # try:
+                #     error = data - target(self[exp])
+                #     rmse = float(np.sqrt(np.nanmean(error**2)))
+                #     label = label + ' bias' + f'\n RMSE=%.4f{scale}' % rmse
+                # except:
+                #     pass
             elif plot_type == 'bias':
                 data = select(field(self[exp]) - target(self[exp]))
                 if demean:
