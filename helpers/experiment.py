@@ -9,11 +9,11 @@ from helpers.computational_tools import *
 from helpers.netcdf_cache import netcdf_property
 import math
 import xesmf as xe
-from xoverturning.compfunc import select_basins
-from xoverturning import calcmoc
+#from xoverturning.compfunc import select_basins
+#from xoverturning import calcmoc
 import gsw
 import glob
-from cmip_basins import generate_basin_codes
+#from cmip_basins import generate_basin_codes
 
 class main_property(cached_property):
     '''
@@ -43,8 +43,9 @@ class Experiment:
         self.Averaging_time=Averaging_time
         self.data_folder = os.path.join(os.path.dirname(helpers.netcdf_cache.__file__), '../data')  # Where observational data is stored
 
-        if not os.path.exists(os.path.join(self.folder, 'ocean_geometry.nc')):
-            print('Error, cannot find files in folder'+self.folder)
+        print(self.folder)
+        #if not os.path.exists(os.path.join(self.folder, 'ocean_geometry.nc')):
+        #    print('Error, cannot find files in folder'+self.folder)
 
     @classmethod
     def get_list_of_netcdf_properties(cls):
@@ -64,12 +65,14 @@ class Experiment:
         try:
             result = xr.open_dataset(os.path.join(self.folder, 'ocean.stats.nc'), decode_times=False)
         except:
-            result = xr.open_dataset(os.path.join(self.folder, 'ocean.stats.merged.nc'), decode_times=False)
+            result = xr.open_dataset(os.path.join(self.folder, 'ocean.stats.nc'), decode_times=False)
         return result
 
     @cached_property
     def param(self):
-        result = sort_longitude(xr.open_dataset(f'{self.data_folder}/ocean_static.nc')).drop_vars('time')
+        #result = sort_longitude(xr.open_dataset(f'{self.data_folder}/ocean_static.nc')).drop_vars('time')
+        file = glob.glob(self.folder+'/*static*.nc')[0] 
+        result = sort_longitude(xr.open_dataset(file)).drop_vars('time')
         rename_coordinates(result)
         return result
 
@@ -93,7 +96,7 @@ class Experiment:
         '''
         This returns as much data as we have in Averaging_time
         '''
-        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, f'*ocean_daily*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, f'*sfc*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
         rename_coordinates(result)
         return result
     
@@ -105,7 +108,16 @@ class Experiment:
     
     @cached_property
     def ocean_month_z(self):
-        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1})).rename({'z_l': 'zl', 'z_i': 'zi'})
+        try:
+            result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*ocean_month_z*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1})).rename({'z_l': 'zl', 'z_i': 'zi'})
+        except:
+            result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*mom6.h.z*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1})).rename({'z_l': 'zl', 'z_i': 'zi'})
+        rename_coordinates(result)
+        return result
+
+    @cached_property
+    def ocean_month_native(self):
+        result = sort_longitude(xr.open_mfdataset(os.path.join(self.folder, '*mom6.h.native*.nc'), parallel=True, combine='nested', compat='no_conflicts', concat_dim='time', chunks={'time':1}))
         rename_coordinates(result)
         return result
     
@@ -206,7 +218,7 @@ class Experiment:
         woa = sort_longitude(xr.open_dataset(f'{self.data_folder}/woa18_decav81B0_t00_01.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).t_an.chunk({}))
         woa_interp = woa.interp(depth=self.zl)
         woa_interp[{'zl':0}] = woa[{'depth':0}]
-        return woa_interp.squeeze().drop_vars(['time', 'depth']).compute()
+        return woa_interp.squeeze().drop_vars(['time', 'depth']).compute().isel(zl=slice(0,-1))
     
     @cached_property
     def woa_salt(self):
@@ -217,7 +229,7 @@ class Experiment:
         woa = sort_longitude(xr.open_dataset(f'{self.data_folder}/woa18_decav81B0_s00_01.nc', decode_times=False).rename({'lat':'yh', 'lon': 'xh'}).s_an.chunk({}))
         woa_interp = woa.interp(depth=self.zl)
         woa_interp[{'zl':0}] = woa[{'depth':0}]
-        return woa_interp.squeeze().drop_vars(['time', 'depth']).compute()
+        return woa_interp.squeeze().drop_vars(['time', 'depth']).compute().isel(zl=slice(0,-1))
     
     @cached_property
     def woa_sigma0(self):
@@ -481,6 +493,7 @@ class Experiment:
             input_data = self.ocean_month_z.thetao#.sel(time=self.Averaging_time).mean('time')
 
         out = self.regrid(input_data, self.woa_temp)
+        print('regridded')
         return xr.where(np.isnan(self.woa_temp), np.nan, out)
     
     @netcdf_property
@@ -604,14 +617,14 @@ class Experiment:
     
     @netcdf_property
     def MLD_summer(self):
-        return self.regrid(self.ocean_month.MLD_003.sel(time=self.Averaging_time).groupby('time.month').mean('time').min('month'), 
+        return self.regrid(self.ocean_month_native.mlotst.sel(time=self.Averaging_time).groupby('time.month').mean('time').min('month'), 
                             self.MLD_summer_obs)
-    
+
     @netcdf_property
     def MLD_winter(self):
-        return self.regrid(self.ocean_month.MLD_003.sel(time=self.Averaging_time).groupby('time.month').mean('time').max('month'),
+        return self.regrid(self.ocean_month_native.mlotst.sel(time=self.Averaging_time).groupby('time.month').mean('time').max('month'),
                             self.MLD_winter_obs)
-    
+
     @netcdf_property
     def ssh_std(self):
         ssh = self.ocean_daily_long.zos.sel(time=self.Averaging_time)

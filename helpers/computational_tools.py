@@ -5,7 +5,6 @@ import numpy.fft as npfft
 from scipy import signal
 import xarray as xr
 import os
-import gcm_filters
 import xgcm
 import cmocean
 import matplotlib.pyplot as plt

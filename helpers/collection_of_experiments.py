@@ -11,6 +11,7 @@ import dask
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import warnings
+import glob
 
 def init_subplots(exps, labels, ncols=3):
     if labels is None:
@@ -78,11 +79,15 @@ class CollectionOfExperiments:
         warnings.filterwarnings("ignore")
         folders = []
         for root, _, _ in os.walk(common_folder):
-            if os.path.isfile(os.path.join(root, additional_subfolder, 'ocean.stats.nc')) or os.path.isfile(os.path.join(root, additional_subfolder, 'ocean.stats.merged.nc')):
-                folder = root[len(common_folder)+1:] # Path w.r.t. common_folder
+            files = glob.glob(os.path.join(root, additional_subfolder, '*static.nc')) + \
+                    glob.glob(os.path.join(root, additional_subfolder, 'ocean.stats.nc'))
+            exists = any(os.path.isfile(f) for f in files)
+            if exists:
+                folder = root[len(common_folder):] # Path w.r.t. common_folder
                 folders.append(
                     folder
                     )
+                print(folder)
 
         if exps_names is None:
             exps_names = folders
@@ -124,15 +129,15 @@ class CollectionOfExperiments:
             plt.xticks(np.arange(6)*365,np.arange(6))
             plt.grid()
             plt.ylabel('Kinetic energy [J]')
-            plt.ylim([0,6e+18])
+            plt.ylim([0,2e+18])
 
             plt.subplot(nrows,1,2)
-            (ds.APE.sum('Interface')).plot(label=label, **kw)
+            ds.Heat.plot(label=label, **kw)
             plt.xlabel('Years')
             plt.xticks(np.arange(6)*365,np.arange(6))
             plt.grid()
-            plt.ylim([3.75e+20, 3.95e+20])
-            plt.ylabel('Available potential energy [J]')
+            #plt.ylim([3.75e+20, 3.95e+20])
+            #plt.ylabel('Available potential energy [J]')
 
             if CFL:
                 plt.subplot(nrows,1,3)
@@ -171,7 +176,7 @@ class CollectionOfExperiments:
         #cmap_bias.set_bad('white', alpha=1)
         #cmap_field.set_bad('white', alpha=1)
 
-        data = select(field(self['unparameterized']))
+        data = select(field(self['no-GM']))
         central_latitude = float(y_coord(data).mean())
         central_longitude = float(x_coord(data).mean())
 
@@ -209,17 +214,17 @@ class CollectionOfExperiments:
                 return float(np.sqrt((data**2 * dx).sum(skipna=True) / dx.sum(skipna=True)))
 
             if demean:
-                data = select(target(self['unparameterized']))
+                data = select(target(self['no-GM']))
                 mean_obs = data.mean()
 
-                data = select(field(self['unparameterized']))
+                data = select(field(self['no-GM']))
                 mean_ctr = data.mean()
                 
             if exp == 'obs':
                 try:
-                    data = select(target(self['unparameterized']))
+                    data = select(target(self['no-GM']))
                 except:
-                    data = select(field(self['unparameterized'])) * np.nan
+                    data = select(field(self['no-GM'])) * np.nan
                 if demean:
                     data = data - mean_obs
                 vmin, vmax = range_field[0:2]
@@ -246,7 +251,7 @@ class CollectionOfExperiments:
                 vmin, vmax = range_bias[0:2]
                 cmap = cmap_bias; norm=norm_bias; cilev=cilev_bias
             elif plot_type == 'response':
-                if exp == 'unparameterized':
+                if exp == 'no-GM':
                     if target(self[exp]) is not None:
                         data = select(field(self[exp]) - target(self[exp]))
                         if demean:
@@ -261,7 +266,7 @@ class CollectionOfExperiments:
                         vmin, vmax = range_field[0:2]
                         cmap = cmap_field; norm=norm_field; cilev=cilev_field
                 else:
-                    data = select(field(self[exp])- field(self['unparameterized']))
+                    data = select(field(self[exp])- field(self['no-GM']))
                     try:
                         corr = - np.nanmean(bias * data) / np.sqrt(np.nanmean(bias**2) * np.nanmean(data**2))
                         attenuation = - np.nanmean(bias * data) / np.nanmean(data**2)
@@ -293,7 +298,7 @@ class CollectionOfExperiments:
                 #data.plot.contour(ax=ax, transform=ccrs.PlateCarree(), colors='k', levels=[0], linewidths=1.5)
 
             if contours_SST:
-                therm_true = self['unparameterized'].woa_temp.isel(zl=0)
+                therm_true = self['no-GM'].woa_temp.isel(zl=0)
                 if exp == 'obs':
                     contours = select(therm_true).plot.contour(ax=ax, colors='b', transform=ccrs.PlateCarree(), linewidths=1.5, levels=SST_levels)
                     plt.clabel(contours, inline=True, fontsize=5, fmt="%d")
@@ -313,13 +318,13 @@ class CollectionOfExperiments:
 
             if overlay_ssh:
                 if exp == 'obs':
-                    contours = select(self['unparameterized'].ssh_mean_obs+2).plot.contour(ax=ax, colors='k', transform=ccrs.PlateCarree(), linewidths=0.5, levels=np.arange(0,4,0.2))
+                    contours = select(self['no-GM'].ssh_mean_obs+2).plot.contour(ax=ax, colors='k', transform=ccrs.PlateCarree(), linewidths=0.5, levels=np.arange(0,4,0.2))
                 else:
                     contours = select(self[exp].ssh_mean+2).plot.contour(ax=ax, colors='k', transform=ccrs.PlateCarree(), linewidths=0.5, levels=np.arange(0,4,0.2))
 
 
             if isotherm_17:
-                therm_true = self['unparameterized'].woa_temp.isel(zl=8)
+                therm_true = self['no-GM'].woa_temp.isel(zl=8)
                 if exp == 'obs':
                     contours = select(therm_true).plot.contour(ax=ax, colors='b', transform=ccrs.PlateCarree(), linewidths=2, levels=[17])
                     plt.clabel(contours, inline=True, fontsize=6, fmt="%d$C^\circ$")
@@ -331,7 +336,7 @@ class CollectionOfExperiments:
                     #plt.clabel(contours, inline=True, fontsize=6, fmt="%d$C^\circ$")
 
             if GS_NAC:
-                therm_true = self['unparameterized'].woa_temp
+                therm_true = self['no-GM'].woa_temp
                 GS_select = lambda x: x.sel(xh=slice(-80,-30), yh=slice(30,60)).isel(zl=9) # Depth200
                 NAC_select = lambda x: x.sel(xh=slice(-50,-30), yh=slice(30,60)).isel(zl=9) # Depth200
                 #Azores_select = lambda x: x.sel(xh=slice(-50,-30), yh=slice(30,60)).isel(zl=14) # Depth 600
@@ -345,7 +350,7 @@ class CollectionOfExperiments:
                     #contours = Azores_select(therm_exp).plot.contour(ax=ax, colors='k', transform=ccrs.PlateCarree(), linewidths=2, levels=[10])
             
             if overlay_depth:
-                depth = self['unparameterized'].depth
+                depth = self['no-GM'].depth
                 contours = select(depth/1000).plot.contour(ax=ax, colors='k', transform=ccrs.PlateCarree(), linewidths=0.5, levels=[0.5, 1, 2, 3, 4, 5])
                 #plt.clabel(contours, inline=True, fontsize=6, fmt="%d")
                 
@@ -367,7 +372,7 @@ class CollectionOfExperiments:
     def plot_temp(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default', ncols=2, 
                   time_range=None, **kw):
         if time_range is None:
-            time_range = self['unparameterized'].Averaging_time
+            time_range = self['no-GM'].Averaging_time
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
                     cmap_bias = plt.cm.RdYlBu_r, 
                     #cmap_bias=cmocean.cm.balance,
@@ -379,12 +384,12 @@ class CollectionOfExperiments:
                     range_field=(None,None), range_bias=(None,None),
                     ncols=ncols, **kw)
         if zl>0:
-            plt.suptitle('Depth=%.1f' % self['unparameterized'].thetao.zl[zl])
+            plt.suptitle('Depth=%.1f' % self['no-GM'].thetao.zl[zl])
 
     def plot_so(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default', ncols=2, 
                   time_range=None, **kw):
         if time_range is None:
-            time_range = self['unparameterized'].Averaging_time
+            time_range = self['no-GM'].Averaging_time
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
                     cmap_bias = plt.cm.RdYlBu_r, 
                     cmap_field=cmocean.cm.balance,
@@ -395,12 +400,12 @@ class CollectionOfExperiments:
                     range_field=(None,None), range_bias=(None,None),
                     ncols=ncols, **kw)
         if zl>0:
-            plt.suptitle('Depth=%.1f' % self['unparameterized'].thetao.zl[zl])
+            plt.suptitle('Depth=%.1f' % self['no-GM'].thetao.zl[zl])
 
     def plot_sigma0(self, exps, labels=None, zl=0, select=select_globe, projection='2D', plot_type = 'default', ncols=2, 
                   time_range=None, **kw):
         if time_range is None:
-            time_range = self['unparameterized'].Averaging_time
+            time_range = self['no-GM'].Averaging_time
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
                     cmap_bias = plt.cm.RdYlBu_r, 
                     cmap_field=cmocean.cm.balance,
@@ -411,7 +416,7 @@ class CollectionOfExperiments:
                     range_field=(None,None), range_bias=(None,None),
                     ncols=ncols, **kw)
         if zl>0:
-            plt.suptitle('Depth=%.1f' % self['unparameterized'].thetao.zl[zl])
+            plt.suptitle('Depth=%.1f' % self['no-GM'].thetao.zl[zl])
 
     def plot_ubar(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', ncols=2, **kw):
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
@@ -428,7 +433,7 @@ class CollectionOfExperiments:
                     field = lambda x: x.MLD_summer, 
                     target = lambda x: x.MLD_summer_obs,
                     scale = 'm', cmap_label = 'Summer MLD, metres',
-                    range_field=(0,80), range_bias=(-20,20),
+                    range_field=(0,80), range_bias=(-10,10),
                     ncols=ncols, **kw)
         
     def plot_MLD_winter(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', ncols=2, vmax=100., **kw):
@@ -536,7 +541,7 @@ class CollectionOfExperiments:
                     scale = 'm/s', cmap_label = 'Modulus of mean velocity [m/s]',
                     range_field=(0,vmax), range_bias=(-vmax,vmax),
                     ncols=ncols, **kw)
-        plt.suptitle('Depth = %d' % int(self['unparameterized'].ocean_month_z.zl[zl]))
+        plt.suptitle('Depth = %d' % int(self['no-GM'].ocean_month_z.zl[zl]))
         
     def plot_temp_section(self, exps, labels=None, select=select_Drake, plot_type = 'default', contour_lines=True):
         default_rcParams({'font.size': 10})
@@ -555,7 +560,7 @@ class CollectionOfExperiments:
             ax = fig.add_subplot(nrows,ncol,ifig+1)
             
             label = labels[ifig]
-            data_obs = select(self['unparameterized'].woa_temp)
+            data_obs = select(self['no-GM'].woa_temp)
             if exp == 'obs':
                 data = data_obs
                 vmin = 0; vmax=30
@@ -573,13 +578,13 @@ class CollectionOfExperiments:
                 vmin = -1; vmax=1
                 cmap = cmap_bias
             elif plot_type == 'response':
-                if exp == 'unparameterized':
+                if exp == 'no-GM':
                     data = select_exp(self[exp].thetao, exp) - data_obs
                     rmse = float(np.sqrt(np.nanmean(data**2)))
                     label = label + ' bias' + '\n RMSE=%.3f' % rmse + '$^oC$'
                     bias = data.copy()
                 else:
-                    data = select_exp(self[exp].thetao, exp) - select_exp(self['unparameterized'].thetao, 'unparameterized')
+                    data = select_exp(self[exp].thetao, exp) - select_exp(self['no-GM'].thetao, 'no-GM')
                     corr = - np.nanmean(bias * data) / np.sqrt(np.nanmean(bias**2) * np.nanmean(data**2))
                     attenuation = - np.nanmean(bias * data) / np.nanmean(data**2)
                     rmse = float(np.sqrt(np.nanmean((data+bias)**2)))
@@ -622,7 +627,7 @@ class CollectionOfExperiments:
             for j_region, region in enumerate(['Gulf', 'Kuroshio', 'Aghulas', 'Malvinas']):
                 plt.subplot(2,2,1+j_region)
                 if exp == 'obs':
-                    KE = self['unparameterized'].__getattribute__(f'geo{type}_{region}_obs')
+                    KE = self['no-GM'].__getattribute__(f'geo{type}_{region}_obs')
                 else:
                     KE = self[exp].__getattribute__(f'geo{type}_{region}')
 
@@ -661,7 +666,7 @@ class CollectionOfExperiments:
         for j_exp,exp in enumerate(exps):
             plt.subplot(2,1,1)
             if exp == 'obs':
-                KE = self['unparameterized'].__getattribute__(f'geo{type}_map_obs')
+                KE = self['no-GM'].__getattribute__(f'geo{type}_map_obs')
             else:
                 KE = self[exp].__getattribute__(f'geo{type}_map')
 
@@ -670,7 +675,7 @@ class CollectionOfExperiments:
 
             plt.subplot(2,1,2)
             if exp == 'obs':
-                scale = self['unparameterized'].__getattribute__('eddy_scale_obs')
+                scale = self['no-GM'].__getattribute__('eddy_scale_obs')
             else:
                 scale = self[exp].__getattribute__('eddy_scale')
 
@@ -685,11 +690,11 @@ class CollectionOfExperiments:
         plt.grid()
         
         plt.subplot(2,1,2)
-        dxt = self['unparameterized'].param.dxt
-        dyt = self['unparameterized'].param.dyt
+        dxt = self['no-GM'].param.dxt
+        dyt = self['no-GM'].param.dyt
         dx = np.sqrt(dxt*dyt) / 1000. # in km
         dx.mean('xh').plot(lw=1.5, color='tab:gray', ls='--', label='Grid spacing OM4')
-        self['unparameterized'].rossby_radius_lat.plot(lw=1.5, color='k', ls='-.', label='Rossby radius')
+        self['no-GM'].rossby_radius_lat.plot(lw=1.5, color='k', ls='-.', label='Rossby radius')
         plt.title('')
         plt.xlabel('Latitude')
         plt.xlim([-60,60])
