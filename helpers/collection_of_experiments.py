@@ -129,7 +129,7 @@ class CollectionOfExperiments:
             plt.xticks(np.arange(6)*365,np.arange(6))
             plt.grid()
             plt.ylabel('Kinetic energy [J]')
-            plt.ylim([0,2e+18])
+            plt.ylim([0,4e+18])
 
             plt.subplot(nrows,1,2)
             ds.Heat.plot(label=label, **kw)
@@ -448,7 +448,7 @@ class CollectionOfExperiments:
     def plot_ssh(self, exps, labels=None, select=select_globe, projection='2D', plot_type = 'default', ncols=2, idx=-1, **kw):
         self.plot_map(exps, labels=labels, select=select, projection=projection, plot_type = plot_type,
                     cmap_bias = plt.cm.seismic, cmap_field=cmocean.cm.balance,
-                    field = lambda x: x.ocean_daily.zos.isel(time=idx), 
+                    field = lambda x: x.ocean_daily_long.zos.isel(time=idx), 
                     target = lambda x: x.ssh_obs.isel(time=idx),
                     scale = 'm', cmap_label = 'SSH snapshot, m',
                     range_field=(-1,1), range_bias=(-0.1,0.1),

@@ -273,7 +273,7 @@ class Experiment:
         GLORYS12V1 Reanalysis
         1993-2016
         '''
-        obs = xr.open_dataset(f'{self.data_folder}/ssh_mean_glorys.nc', decode_times=False).zos.chunk({})
+        obs = xr.open_dataset(f'{self.data_folder}/ssh_mean_glorys.nc', dexcode_times=False).zos.chunk({})
         return obs
     
     @cached_property
@@ -281,8 +281,11 @@ class Experiment:
         '''
         Copernicus data 1993-1995
         '''
-        return sort_longitude(xr.open_dataset('/scratch/pp2681/altimetry_Copernicus.nc', chunks={'time':1}).rename(
-            {'longitude': 'xh', 'latitude': 'yh'}).adt.sel(time=slice('1993','1995')))
+        try:
+            return sort_longitude(xr.open_dataset('/scratch/pp2681/altimetry_Copernicus.nc', chunks={'time':1}).rename(
+                {'longitude': 'xh', 'latitude': 'yh'}).adt.sel(time=slice('1993','1995')))
+        except:
+            return xr.DataArray(np.nan * np.zeros((1,1,1)), dims=['xh', 'yh', 'time'])
     
     @cached_property
     def geoKE_Gulf_obs(self):
@@ -897,12 +900,12 @@ class Experiment:
         fq = 2 * Omega * np.sin(self.param.yq * deg_to_rad)
         grid = create_grid_global(self.param)
 
-        hy = grid.diff(self.ocean_daily.zos, 'Y') / self.param.dyCv
+        hy = grid.diff(self.ocean_daily_long.zos, 'Y') / np.sqrt(self.param.areacello_cv)
         
         u = grid.interp(- g / fq * hy, 'Y')
         #u = xr.where(np.abs(u.yh)<10, np.nan, u)
 
-        u['time'] = self.ocean_daily.time.copy()
+        u['time'] = self.ocean_daily_long.time.copy()
 
         return u
 
@@ -917,12 +920,12 @@ class Experiment:
         fh = 2 * Omega * np.sin(self.param.yh * deg_to_rad)
         grid = create_grid_global(self.param)
 
-        hx = grid.diff(self.ocean_daily.zos, 'X') / self.param.dxCu
+        hx = grid.diff(self.ocean_daily_long.zos, 'X') / np.sqrt(self.param.areacello_cu)
         
         v = grid.interp(+ g / fh * hx, 'X')
         #v = xr.where(np.abs(v.yh)<10, np.nan, v)
 
-        v['time'] = self.ocean_daily.time.copy()
+        v['time'] = self.ocean_daily_long.time.copy()
 
         return v
     
